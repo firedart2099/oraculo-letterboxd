@@ -10,7 +10,7 @@ import threading
 import subprocess
 import platform
 from flask import Flask, render_template, request, jsonify, Response
-from simplejustwatchapi.justwatch import search
+from justwatch import JustWatch
 from urllib.parse import quote
 from dotenv import load_dotenv
 
@@ -422,6 +422,16 @@ def process_watchlist():
         total = len(df_watchlist_global)
         progresso = {"atual": 0, "total": total, "finalizado": False, "filme_atual": "Ligando os motores..."}
         
+        # Inicializa a API oficial do JustWatch
+        jw = JustWatch(country='BR')
+        
+        # Busca o dicionário de provedores para traduzir o ID em Nome (ex: 8 -> Netflix)
+        try:
+            providers = jw.get_providers()
+            provider_map = {p['id']: p['clear_name'] for p in providers}
+        except:
+            provider_map = {}
+        
         for index, row in df_watchlist_global.iterrows():
             filme = row['Name']
             ano = row['Year']
@@ -432,14 +442,17 @@ def process_watchlist():
             progresso["filme_atual"] = chave
             
             try:
-                busca = search(filme, "BR", "pt", 1, True)
-                if busca and hasattr(busca[0], 'offers'):
-                    for offer in busca[0].offers:
-                        nome = offer.package.name
-                        tipo = str(getattr(offer, 'monetization_type', '')).upper()
-                        if 'FLATRATE' in tipo or 'FREE' in tipo or 'ADS' in tipo:
-                            if nome not in streamings:
-                                streamings.append(nome)
+                busca = jw.search_for_item(query=filme)
+                if busca and 'items' in busca and len(busca['items']) > 0:
+                    item = busca['items'][0]
+                    if 'offers' in item:
+                        for offer in item['offers']:
+                            tipo = str(offer.get('monetization_type', '')).upper()
+                            if 'FLATRATE' in tipo or 'FREE' in tipo or 'ADS' in tipo:
+                                prov_id = offer.get('provider_id')
+                                nome = provider_map.get(prov_id, f"Serviço {prov_id}")
+                                if nome not in streamings:
+                                    streamings.append(nome)
             except: pass
             
             if not streamings: streamings.append("Não disponível")
