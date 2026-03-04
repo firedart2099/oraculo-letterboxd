@@ -10,7 +10,6 @@ import threading
 import subprocess
 import platform
 from flask import Flask, render_template, request, jsonify, Response
-from justwatch import JustWatch
 from urllib.parse import quote
 from dotenv import load_dotenv
 
@@ -412,27 +411,15 @@ def download_combined_watchlist():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-@app.route('/process_watchlist', methods=['POST'])
-def process_watchlist():
-    global df_watchlist_global, progresso
-    if df_watchlist_global is None: return jsonify({'erro': 'A Watchlist não foi carregada.'}), 400
-        
+# ========================================================
+# FUNÇÃO PESADA RODANDO NO FUNDO PARA NÃO TRAVAR O SERVIDOR
+# ========================================================
+def processar_em_segundo_plano(df_lista):
+    global progresso
+    dados_filmes = {}
+    
     try:
-        dados_filmes = {}
-        total = len(df_watchlist_global)
-        progresso = {"atual": 0, "total": total, "finalizado": False, "filme_atual": "Ligando os motores..."}
-        
-        # Inicializa a API oficial do JustWatch
-        jw = JustWatch(country='BR')
-        
-        # Busca o dicionário de provedores para traduzir o ID em Nome (ex: 8 -> Netflix)
-        try:
-            providers = jw.get_providers()
-            provider_map = {p['id']: p['clear_name'] for p in providers}
-        except:
-            provider_map = {}
-        
-        for index, row in df_watchlist_global.iterrows():
+        for index, row in df_lista.iterrows():
             filme = row['Name']
             ano = row['Year']
             chave = f"{filme} ({ano})"
@@ -441,23 +428,41 @@ def process_watchlist():
             progresso["atual"] = index + 1
             progresso["filme_atual"] = chave
             
+            # API OFICIAL DO TMDB (100% à prova de bloqueios e super veloz)
             try:
-                busca = jw.search_for_item(query=filme)
-                if busca and 'items' in busca and len(busca['items']) > 0:
-                    item = busca['items'][0]
-                    if 'offers' in item:
-                        for offer in item['offers']:
-                            tipo = str(offer.get('monetization_type', '')).upper()
-                            if 'FLATRATE' in tipo or 'FREE' in tipo or 'ADS' in tipo:
-                                prov_id = offer.get('provider_id')
-                                nome = provider_map.get(prov_id, f"Serviço {prov_id}")
-                                if nome not in streamings:
+                # 1. Busca o ID do filme
+                search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={quote(filme)}&language=pt-BR"
+                if pd.notna(ano): 
+                    search_url += f"&year={int(ano)}"
+                
+                res_search = requests.get(search_url, timeout=5).json()
+                
+                if res_search.get('results'):
+                    movie_id = res_search['results'][0]['id']
+                    
+                    # 2. Busca onde o filme está passando no Brasil
+                    prov_url = f"https://api.themoviedb.org/3/movie/{movie_id}/watch/providers?api_key={TMDB_API_KEY}"
+                    prov_res = requests.get(prov_url, timeout=5).json()
+                    
+                    br_data = prov_res.get('results', {}).get('BR', {})
+                    
+                    # 3. Puxa assinaturas, gratuitos e com anúncios
+                    for cat in ['flatrate', 'free', 'ads']:
+                        if cat in br_data:
+                            for provider in br_data[cat]:
+                                nome = provider.get('provider_name')
+                                if nome and nome not in streamings:
                                     streamings.append(nome)
-            except: pass
+            except Exception as e:
+                print(f"Erro ao buscar TMDB Providers para {filme}: {e}")
+                pass
             
-            if not streamings: streamings.append("Não disponível")
+            if not streamings: 
+                streamings.append("Não disponível")
+                
             dados_filmes[chave] = streamings
         
+        # Salva o arquivo quando terminar
         dados_finais = {"stats": {}, "watchlist": dados_filmes}
         if os.path.exists(ARQUIVO_DADOS):
             with open(ARQUIVO_DADOS, 'r', encoding='utf-8') as f:
@@ -468,11 +473,26 @@ def process_watchlist():
             json.dump(dados_finais, f, ensure_ascii=False, indent=4)
             
         progresso["finalizado"] = True
-        return jsonify({'mensagem': 'Sucesso'})
+        print("\n✅ Busca de Watchlist concluída com sucesso!")
         
     except Exception as e:
+        print(f"❌ Erro fatal na Thread de Watchlist: {e}")
         progresso["finalizado"] = True
-        return jsonify({'erro': str(e)}), 500
+
+
+@app.route('/process_watchlist', methods=['POST'])
+def process_watchlist():
+    global df_watchlist_global, progresso
+    if df_watchlist_global is None: return jsonify({'erro': 'A Watchlist não foi carregada.'}), 400
+        
+    total = len(df_watchlist_global)
+    progresso = {"atual": 0, "total": total, "finalizado": False, "filme_atual": "Ligando os motores..."}
+    
+    # INICIA A TAREFA NUMA "VIA EXPRESSA" SEPARADA (THREADING)
+    thread = threading.Thread(target=processar_em_segundo_plano, args=(df_watchlist_global,))
+    thread.start()
+    
+    return jsonify({'mensagem': 'Busca iniciada com sucesso em segundo plano'})
 
 def liberar_porta(porta):
     """Mata qualquer processo que esteja usando a porta 5000 antes de iniciar"""
