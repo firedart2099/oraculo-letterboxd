@@ -351,10 +351,15 @@
             </div>
         </div>
 
-        <div class="text-center mt-4">
-            <button onclick="toggleImportTutorial()" class="text-[11px] text-[#8c9bab] hover:text-[#40bcf4] font-bold tracking-widest uppercase transition-colors underline decoration-dashed underline-offset-4 flex items-center justify-center gap-1 mx-auto">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Não sabe como conseguir o arquivo .zip?
+        <div class="text-center mt-6 space-y-4">
+            <!-- BOTÃO DIRETO DE DOWNLOAD SUPER VISÍVEL -->
+            <a href="https://letterboxd.com/data/export/" target="_blank" class="inline-flex items-center justify-center gap-2 bg-[#40bcf4]/10 hover:bg-[#40bcf4]/20 text-[#40bcf4] border border-[#40bcf4]/30 px-5 py-3 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_15px_rgba(64,188,244,0.15)] w-[90%] sm:w-auto mx-auto">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Baixar meu .zip do Letterboxd
+            </a>
+            
+            <button onclick="toggleImportTutorial()" class="block w-full text-[10px] text-[#8c9bab] hover:text-white font-bold tracking-widest uppercase transition-colors underline decoration-dashed underline-offset-4 mx-auto">
+                Ver outras formas de importar
             </button>
             
             <div id="import-tutorial" class="hidden mt-6 p-6 bg-[#1c2228]/95 border border-[#2c3440] rounded-xl text-left text-sm text-gray-300 max-w-lg mx-auto shadow-xl animate-fade-in-fast">
@@ -382,7 +387,7 @@
                         </ol>
                     </div>
 
-                    <p class="text-xs font-bold text-center mt-2 border-t border-[#2c3440] pt-3">Por fim, arraste o arquivo <span class="text-[#40bcf4] font-mono">.zip</span> baixado para a área tracejada acima!</p>
+                    <p class="text-xs font-bold text-center mt-2 border-t border-[#2c3440] pt-3">Por fim, envie o arquivo <span class="text-[#40bcf4] font-mono">.zip</span> baixado para a área tracejada acima!</p>
                 </div>
             </div>
         </div>
