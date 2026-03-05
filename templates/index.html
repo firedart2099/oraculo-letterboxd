@@ -265,28 +265,28 @@
     </div>
 </div>
 
-<!-- MODAL DE DOAÇÃO - Altura Limitada -->
+<!-- MODAL DE DOAÇÃO - Altura Limitada & UI Ajustada -->
 <div id="donation-modal" class="fixed inset-0 bg-[#14181c]/95 z-[10000] hidden items-center justify-center backdrop-blur-sm p-4">
     <div class="bg-[#1c2228] border border-[#ff8000]/50 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl relative text-center animate-fade-in-fast max-h-[90vh] overflow-y-auto no-scrollbar flex flex-col">
         <button onclick="fecharDoacao()" class="absolute top-4 right-5 text-[#8c9bab] hover:text-white text-3xl font-light">&times;</button>
         
-        <div class="w-16 h-16 bg-[#ff8000]/10 rounded-full flex items-center justify-center text-[#ff8000] mx-auto mb-4 border border-[#ff8000]/30 shrink-0">
-            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"></path></svg>
+        <div class="w-14 h-14 md:w-16 md:h-16 bg-[#ff8000]/10 rounded-full flex items-center justify-center text-[#ff8000] mx-auto mb-4 border border-[#ff8000]/30 shrink-0">
+            <svg class="w-7 h-7 md:w-8 md:h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"></path></svg>
         </div>
         
         <h3 class="text-xl md:text-2xl font-black text-white uppercase tracking-tighter mb-2">Apoie o Projeto</h3>
-        <p class="text-[#8c9bab] text-xs md:text-sm mb-6 leading-relaxed flex-1">
-            As consultas à Inteligência Artificial têm um pequeno custo.<br><br>
-            Se o site te está a ajudar, considera apoiar o projeto com <strong>R$ 1,90</strong> para manter os servidores!
+        
+        <!-- Texto Refinado e Natural -->
+        <p class="text-[#8c9bab] text-[11px] sm:text-xs md:text-sm mb-6 leading-relaxed flex-1">
+            As consultas à IA e os bancos de dados de streaming têm um custo.<br><br>
+            Se você está curtindo a experiência, considere dar um apoio de apenas <strong>R$ 1,90</strong>. E já aviso: se os servidores caírem e o site sair do ar, a culpa é sua! 💀
         </p>
         
         <div class="space-y-3 shrink-0 mt-auto">
-            <button onclick="abrirMercadoPago()" class="w-full bg-gradient-to-r from-[#ff8000] to-[#e67300] text-[#14181c] font-black py-4 rounded-xl uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2">
+            <button onclick="abrirMercadoPago()" class="w-full bg-gradient-to-r from-[#ff8000] to-[#e67300] text-[#14181c] font-black py-3 sm:py-3.5 px-4 rounded-xl uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 text-[10px] sm:text-xs">
                 Apoiar com Mercado Pago
             </button>
-            <button onclick="recarregarGratis()" class="w-full bg-transparent border border-[#2c3440] text-[#8c9bab] font-bold py-3 rounded-xl uppercase tracking-widest text-[10px]">
-                Continuar de graça
-            </button>
+            <!-- Botão de 'continuar de graça' removido conforme solicitado -->
         </div>
     </div>
 </div>
@@ -322,7 +322,6 @@
     </header>
 
     <div id="main-content" class="space-y-6 sm:space-y-10">
-        <!-- Títulos Otimizados -->
         <div class="text-center space-y-3 sm:space-y-4 pt-4 sm:pt-10">
             <h2 class="text-3xl sm:text-4xl md:text-6xl font-black text-white leading-tight tracking-tighter drop-shadow-lg">QUAL É O SEU PERFIL <br><span class="text-[#40bcf4] italic">CINEMATOGRÁFICO?</span></h2>
             <p class="text-[#8c9bab] max-w-xl mx-auto text-sm sm:text-base md:text-lg font-medium px-2">Envie o seu arquivo de exportação do Letterboxd (.zip) para iniciarmos a análise dos seus dados.</p>
@@ -372,7 +371,6 @@
                             <li>O download do <span class="font-mono text-white">.zip</span> começa na hora!</li>
                         </ol>
                         
-                        <!-- AVISO DE DEEP LINKING MOBILE PARA COPIAR -->
                         <div class="mt-3 bg-[#14181c] border border-[#ff8000]/40 p-2 sm:p-3 rounded-lg text-left shadow-inner">
                             <p class="text-[#ff8000] text-[9px] sm:text-[10px] font-bold mb-1.5 leading-relaxed">
                                 🚨 AVISO (CELULAR): Se o botão abrir o Aplicativo e ficar travado num loop, copie o link abaixo e cole no Chrome ou Safari:
@@ -479,7 +477,7 @@
             </div>
         </div>
 
-        <!-- LOADING DA WATCHLIST -->
+        <!-- LOADING DA WATCHLIST: TEXTO EXPLICATIVO ADICIONADO -->
         <div id="loading-container" class="hidden mt-10 max-w-2xl mx-auto bg-[#1c2228] md:bg-[#1c2228]/95 p-5 md:p-10 rounded-2xl md:rounded-3xl border border-[#2c3440] relative overflow-hidden z-20">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#40bcf4] via-[#00e054] to-[#40bcf4] bg-[length:200%_200%] animate-gradient-x"></div>
             
@@ -489,9 +487,15 @@
                 </div>
                 
                 <h3 class="text-xl md:text-3xl font-black text-white uppercase tracking-tighter mb-2">Buscando Plataformas</h3>
-                <p id="current-movie-name" class="text-[#8c9bab] text-xs md:text-sm max-w-lg mx-auto truncate">A processar...</p>
                 
-                <div class="flex flex-row justify-center gap-2 mt-4">
+                <p class="text-[#8c9bab] text-[10px] sm:text-xs max-w-lg mx-auto leading-relaxed mb-4 px-2">
+                    O sistema está cruzando a sua <strong>Watchlist</strong>, filme por filme, com os catálogos mundiais de streaming. <br><br>
+                    <span class="text-[#40bcf4] font-bold block bg-[#40bcf4]/10 p-2 rounded-lg border border-[#40bcf4]/20 mt-1">Aviso: Este processo completo só ocorre na sua primeira visita. Nas próximas, usaremos o cache local e será 100% instantâneo!</span>
+                </p>
+                
+                <p id="current-movie-name" class="text-white font-medium text-xs md:text-sm max-w-sm mx-auto truncate bg-[#14181c] py-2 px-4 rounded-lg border border-[#2c3440] inline-block shadow-inner mt-2">A processar...</p>
+                
+                <div class="flex flex-row justify-center gap-2 mt-5">
                     <div class="bg-[#14181c] p-3 rounded-xl border border-[#2c3440] flex-1">
                         <span class="block text-[8px] text-[#8c9bab] font-black uppercase mb-1">Verificados</span>
                         <span id="loading-count" class="text-lg font-black text-[#40bcf4]">0/0</span>
@@ -643,8 +647,8 @@
     async function consumirCredito() { try { await fetch('/api/consumir_credito', { method: 'POST' }); } catch (e) {} }
     function abrirDoacao() { document.getElementById('donation-modal')?.classList.remove('hidden'); document.getElementById('donation-modal')?.classList.add('flex'); }
     function fecharDoacao() { document.getElementById('donation-modal')?.classList.add('hidden'); document.getElementById('donation-modal')?.classList.remove('flex'); }
-    function abrirMercadoPago() { window.open("https://mpago.la/15FPHv4", '_blank'); recarregarGratis(); }
-    async function recarregarGratis() { try { for(let i=0;i<5;i++) await fetch('/api/adicionar_credito', { method: 'POST' }); } catch (e) {} fecharDoacao(); }
+    function abrirMercadoPago() { window.open("https://mpago.la/15FPHv4", '_blank'); fecharDoacao(); recarregarGratis(); }
+    async function recarregarGratis() { try { for(let i=0;i<5;i++) await fetch('/api/adicionar_credito', { method: 'POST' }); } catch (e) {} }
 
     const platformPrices = { "Netflix": 39.90, "Prime Video": 19.90, "Max": 39.90, "MUBI": 34.90, "Disney+": 43.90, "Globoplay": 24.90, "Apple TV+": 21.90, "Telecine": 29.90, "Paramount+": 19.90, "Claro TV+": 34.90, "MGM+": 14.90, "Looke": 16.90, "Pluto TV": 0.00, "Crunchyroll": 14.90, "Star+": 43.90, "Belas Artes": 14.90, "Oldflix": 16.90, "Mercado Play": 0.00, "Plex": 0.00, "NetMovies": 0.00, "Libreflix": 0.00 };
 
