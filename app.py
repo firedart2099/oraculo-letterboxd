@@ -26,6 +26,12 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 DB_NAME = "oraculo.db"
 
 # ==========================================
+# GATILHO DE ANIVERSÁRIO DA LAURA
+# (Mude para False amanhã para desativar!)
+# ==========================================
+IS_LAURA_BIRTHDAY_ACTIVE = True
+
+# ==========================================
 # CONFIGURAÇÃO DO BANCO DE DADOS SQLITE
 # ==========================================
 def get_db():
@@ -111,7 +117,6 @@ def get_ip():
     else:
         return request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0]
 
-# --- EXTRATOR DE LINKS BOXD.IT APRIMORADO ---
 def resolve_boxd_links(links_str):
     if pd.isna(links_str) or not str(links_str).strip():
         return []
@@ -123,7 +128,6 @@ def resolve_boxd_links(links_str):
             partes = res.url.strip('/').split('/')
             if 'film' in partes:
                 slug = partes[partes.index('film') + 1]
-                # FIX DO PERFECT DAYS: Remove " -2023 " ou qualquer ano colado no fim do link
                 slug = re.sub(r'-\d{4}$', '', slug)
                 filmes.append(slug.replace('-', ' ').title())
         except: pass
@@ -218,7 +222,8 @@ def upload_profile():
             "favoritos": [], 
             "username": "", 
             "bio": "", 
-            "profile_favorites": []
+            "profile_favorites": [],
+            "is_laura_birthday": False
         }
         vistos_temp = set()
         amados_temp = []
@@ -237,6 +242,9 @@ def upload_profile():
                             stats_usuario["bio"] = re.sub(r'<[^>]+>', '', bio_raw) if bio_raw != 'nan' else ""
                             fav_links = str(row.get("Favorite Films", ""))
                             stats_usuario["profile_favorites"] = resolve_boxd_links(fav_links)
+                            
+                            if IS_LAURA_BIRTHDAY_ACTIVE and stats_usuario["username"].strip().lower() == 'lauraamora':
+                                stats_usuario["is_laura_birthday"] = True
                 
                 if 'watched.csv' in z.namelist():
                     with z.open('watched.csv') as f_watched:
@@ -271,6 +279,7 @@ def upload_profile():
                         watchlist_temp = df_watch[['Name', 'Year']].fillna("").to_dict('records')
 
         salvar_sessao(session_id, list(vistos_temp), amados_temp, odiados_temp, watchlist_temp)
+        set_progresso(session_id, 0, 0, False, "Aguardando...")
                         
         return jsonify({'stats': stats_usuario})
     except Exception as e: 
@@ -284,38 +293,70 @@ def gerar_perfil():
     if not GROQ_API_KEY: return jsonify({"erro": "Sem chave da Groq"}), 400
 
     favoritos_nomes = [f['Name'] for f in stats.get('favoritos', [])]
+    is_laura = stats.get('is_laura_birthday', False)
     
-    prompt = f"""Atue como um crítico de cinema com dupla personalidade. A sua missão é analisar o perfil deste utilizador do Letterboxd.
-    
-    DADOS PESSOAIS (USE ISSO PARA A ANÁLISE):
-    - Username: {stats.get('username', 'Cinéfilo')}
-    - Bio do perfil: "{stats.get('bio', 'Sem bio')}"
-    - Os 4 Filmes Favoritos: {', '.join(stats.get('profile_favorites', ['Nenhum']))}
-    
-    ESTATÍSTICAS GERAIS:
-    - Total de filmes vistos: {stats.get('total_avaliados', 0)}
-    - Média de notas (de 0 a 5): {stats.get('media_notas', 0)}
-    - Outros filmes que ele deu nota altíssima: {', '.join(favoritos_nomes[:10])}
+    if is_laura:
+        # PROMPT EXCLUSIVO DO ANIVERSÁRIO DA LAURA
+        prompt = f"""Atue como um melhor amigo dando um presente mágico de aniversário. A usuária se chama Laura (username: lauraamora) e HOJE É O ANIVERSÁRIO DELA!
+        
+        DADOS DELA:
+        - Bio: "{stats.get('bio', '')}"
+        - Os 4 Filmes Favoritos: {', '.join(stats.get('profile_favorites', ['Nenhum']))}
+        
+        Sua missão é escrever uma mensagem de FELIZ ANIVERSÁRIO incrivelmente linda, poética e afetuosa. 
+        Use os filmes favoritos dela como metáfora para elogiar a pessoa maravilhosa que ela é.
+        Crie "DOIS PARÁGRAFOS" (separados por \\n\\n). 
+        - Parágrafo 1: Deseje feliz aniversário, celebre o dia dela e cite como o gosto dela por esses filmes mostra uma alma gigante.
+        - Parágrafo 2: Continue elogiando a sensibilidade dela e deixe claro que esse site é um presente especial só para ela hoje.
+        
+        REGRA: ZERO DEBOCHE, ZERO SARCASMO! Apenas carinho puro. Use emojis comemorativos (🎂, ✨, 💖, 🎈, 🎬, 🌟).
+        
+        REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática e a legibilidade do texto. Não invente palavras.
+        
+        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER a protagonista do filme favorito dela.
+        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
+        
+        É OBRIGATÓRIO responder APENAS em JSON estruturado:
+        {{
+          "titulo": "✨ Feliz Aniversário, Laura! 🎂",
+          "personagem_referencia": "A Protagonista (Você)",
+          "filme_referencia": "Amelie",
+          "descricao": "Texto gerado aqui..."
+        }}"""
+    else:
+        # PROMPT NORMAL PARA OS OUTROS USUÁRIOS
+        prompt = f"""Atue como um crítico de cinema gen-z cronicamente online.
+        DADOS PESSOAIS DO USUÁRIO:
+        - Username: {stats.get('username', 'Cinéfilo')}
+        - Bio do perfil: "{stats.get('bio', 'Sem bio')}"
+        - Os 4 Filmes Favoritos: {', '.join(stats.get('profile_favorites', ['Nenhum']))}
+        
+        ESTATÍSTICAS GERAIS:
+        - Total de filmes vistos: {stats.get('total_avaliados', 0)}
+        - Média de notas (de 0 a 5): {stats.get('media_notas', 0)}
+        - Outros filmes que amou: {', '.join(favoritos_nomes[:10])}
 
-    Crie um "Perfil Psicológico" com EXATAMENTE DOIS PARÁGRAFOS na chave "descricao" (separe-os usando \\n\\n):
-    
-    PARÁGRAFO 1 (O Deboche Cronicamente Online): Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que ela escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas dela. Use um humor fino e irônico.
-    
-    PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda. Mostre que, lendo as entrelinhas da Bio e dos favoritos, você enxerga uma alma sensível. Elogie a forma como ela usa o cinema como catarse. 
-    
-    REGRA DE EMOJIS (MUITO IMPORTANTE): Em AMBOS OS PARÁGRAFOS (tanto no debochado quanto no poético), você DEVE temperar o texto usando EXCLUSIVAMENTE ALGUNS destes emojis específicos: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈. A graça é exatamente essa: falar coisas lindíssimas e sensíveis no segundo parágrafo, mas continuar a pontuar com emojis dramáticos e caóticos de deboche (ex: "...sua busca genuína por beleza e significado 😭💅").
+        Crie um "Perfil Psicológico" na chave "descricao" com EXATAMENTE DOIS PARÁGRAFOS (separe-os usando \\n\\n):
+        
+        PARÁGRAFO 1 (O Deboche Cronicamente Online): Fale DIRETAMENTE com o usuário (use sempre a palavra "você"). Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que a pessoa escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas que ela tem.
+        PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda. Continue falando diretamente com o usuário ("você"). Elogie a forma como o usuário usa o cinema como catarse, buscando beleza e significado. 
+        
+        REGRA DE GÊNERO: NUNCA assuma o gênero do usuário baseado no nome. Trate o usuário de forma neutra ou diretamente por "você". É ESTRITAMENTE PROIBIDO usar palavras como "rainha", "rei", "ela" ou "ele" para se referir ao usuário.
+        
+        REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática, a coesão e a legibilidade do texto. Mantenha um português impecável. NUNCA invente palavras ou gírias que não existem.
+        
+        REGRA DE EMOJIS: Em AMBOS OS PARÁGRAFOS tempere o texto usando EXCLUSIVAMENTE ALGUNS destes emojis específicos: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈. A graça é falar coisas lindíssimas no segundo parágrafo, mas continuar a pontuar com emojis de deboche (ex: "...sua busca genuína por beleza 😭💅").
 
-    REGRA CRÍTICA 1: "personagem_referencia" DEVE SER um personagem FICTÍCIO REAL de cinema.
-    REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
-    REGRA CRÍTICA 3: MANTENHA OS NOMES DOS FILMES EM INGLÊS E NÃO OS TRADUZA.
+        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER um personagem fictício real.
+        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
 
-    É OBRIGATÓRIO responder APENAS em JSON estruturado:
-    {{
-      "titulo": "O Romântico Disfarçado de Cínico 💅",
-      "personagem_referencia": "Lady Bird",
-      "filme_referencia": "Lady Bird",
-      "descricao": "É lindíssimo ver o esforço que você faz para manter essa curadoria de intelectual 🤓. Você ostenta 'Come and See' na vitrine, implorando por validação 🤌. Só que a sua média de notas expõe que a sua verdadeira paz está em chorar com farofa de estúdio 😭. Essa tentativa desesperada de misturar alta cultura com comédia genérica é um pedido de socorro 💀💅.\\n\\nMas, tirando a armadura de ironia, a verdade é que o seu amor pelo cinema é incrivelmente puro e visceral 😭. Ao olhar os seus favoritos, nota-se uma busca genuína por afeto e beleza nas frestas da vida 🥺🤌. Você não assiste a filmes apenas para preencher listas, mas para preencher a alma 💀. A sua curadoria revela alguém que ainda acredita na magia de uma tela grande e se permite ser profundamente tocado, quebrado e curado pelas histórias 🫦🔥."
-    }}"""
+        É OBRIGATÓRIO responder APENAS em JSON estruturado:
+        {{
+          "titulo": "A Farsa do Cinema Cult 💅",
+          "personagem_referencia": "Kendall Roy",
+          "filme_referencia": "Drive",
+          "descricao": "Texto gerado aqui..."
+        }}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
@@ -332,11 +373,19 @@ def gerar_perfil():
             return jsonify(json.loads(res.json()['choices'][0]['message']['content']))
         raise Exception("Falha na API da Groq")
     except Exception as e:
+        if is_laura:
+            return jsonify({
+                "titulo": "✨ Feliz Aniversário, Laura! 🎂",
+                "personagem_referencia": "A Protagonista da Própria Vida",
+                "filme_referencia": "La La Land",
+                "descricao": "Opa Laura! Hoje o dia é todo seu! ✨ Até o servidor ficou tão emocionado com a sua presença que decidiu pular a análise fria só para te desejar o melhor dia de todos. Que a sua vida continue sendo um roteiro lindo, cheio de amor e trilhas sonoras inesquecíveis. Aproveite o seu presente! 🎈💖"
+            })
+            
         return jsonify({
             "titulo": "O Erro 404 da Estética 🤓",
             "personagem_referencia": "HAL 9000",
             "filme_referencia": "2001: A Space Odyssey",
-            "descricao": "A sua lista de filmes é tão caótica que o algoritmo simplesmente desistiu de procurar coerência e pediu demissão 💀. A tentativa de misturar a alta cultura com blockbusters genéricos resultou numa falha crítica no meu sistema. Vai ler um livro 🙄.\n\nMas brincadeiras à parte, algo na sua conexão com o cinema foi tão intenso que quebrou nossos circuitos 😭💅. Continue amando filmes de forma inexplicável 🥺🤌."
+            "descricao": "A sua lista de filmes exala tanta contradição que o algoritmo simplesmente recusou-se a processar e pediu demissão 💀. É muito delírio achar que essa curadoria genérica faz sentido. Vai ler um livro 🙄.\n\nMas brincadeiras à parte, algo na sua conexão com o cinema quebrou nossos circuitos 😭💅. Continue sentindo tudo de forma inexplicável 🥺🤌."
         })
 
 @app.route('/oraculo', methods=['GET', 'POST'])
