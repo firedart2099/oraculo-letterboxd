@@ -24,9 +24,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # === SISTEMA DE SESSÕES ISOLADAS ===
-# Agora cada usuário tem os seus próprios arquivos para não haver conflitos!
+# Agora cada utilizador tem os seus próprios ficheiros para não haver conflitos!
 def get_session_file(session_id, prefix):
-    # Limpa o ID para evitar injeção de caracteres perigosos
     sid = re.sub(r'\W+', '', str(session_id))
     if not sid: sid = "default"
     return f"{prefix}_{sid}.json"
@@ -49,7 +48,7 @@ def get_progresso(session_id):
 def garantir_arquivos_externos():
     if not os.path.exists(ARQUIVO_FRASES):
         with open(ARQUIVO_FRASES, 'w', encoding='utf-8') as f:
-            f.write("Cruzando suas notas com o watched.csv...\nVasculhando o submundo do cinema cult...\nEvitando os filmes que você já viu...")
+            f.write("Cruzando as tuas notas com o watched.csv...\nVasculhando o submundo do cinema cult...\nEvitando os filmes que já viste...")
     if not os.path.exists(ARQUIVO_PERFIS):
         with open(ARQUIVO_PERFIS, 'w', encoding='utf-8') as f:
             json.dump([], f)
@@ -212,24 +211,27 @@ def gerar_perfil():
 
     favoritos_nomes = [f['Name'] for f in stats.get('favoritos', [])]
     
+    # PROMPT ORIGINAL RESTAURADO (O SARCASMO VOLTOU!)
     prompt = f"""Atue como aquele seu amigo cinéfilo cronicamente online do Letterboxd, que é extremamente irônico, debochado, mas no fundo fala umas verdades que doem na alma. Você vai analisar e destruir o ego deste usuário com base nestes dados:
     - Total de filmes vistos: {stats.get('total_avaliados', 0)}
-    - Média de notas: {stats.get('media_notas', 0)}
-    - Filmes favoritos: {', '.join(favoritos_nomes)}
+    - Média de notas (de 0 a 5): {stats.get('media_notas', 0)}
+    - Filmes favoritos (nota máxima): {', '.join(favoritos_nomes)}
 
-    Crie um "Perfil Psicológico" hilário. A "descricao" TEM QUE SER um parágrafo longo, robusto (5 a 8 linhas). Aponte contradições.
-    OBRIGATÓRIO 1: PT-BR bem informal ("tá", "mano").
-    OBRIGATÓRIO 2: Tempere com emojis (🙄💀💅🫦🔥🤓).
-    OBRIGATÓRIO 3: "personagem_referencia" DEVE SER um personagem FICTÍCIO REAL de cinema.
-    OBRIGATÓRIO 4: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
-    OBRIGATÓRIO 5: NUNCA TENTE TRADUZIR OS TÍTULOS.
+    Crie um "Perfil Psicológico" hilário, que faça a pessoa ler e pensar "meu deus do céu, esse sou literalmente eu kkkkk 💀". 
+    A "descricao" TEM QUE SER um parágrafo longo, robusto (cerca de 5 a 8 linhas). Aponte o dedo para as contradições bizarras e ridículas dele (tipo pagar de intelectual de cinema europeu mas dar 5 estrelas pra comédias de gosto duvidoso e blockbusters). Julgue sem dó, com muito deboche, mas de forma carismática.
 
-    É OBRIGATÓRIO responder APENAS em JSON estruturado:
+    OBRIGATÓRIO 1: Escreva em Português do Brasil (PT-BR) bem informal, como se fosse um tweet viral ("tá", "mano", "tipo isso", "né", "saca").
+    OBRIGATÓRIO 2: Tempere o texto da "descricao" usando APENAS e EXCLUSIVAMENTE alguns destes emojis específicos (espalhe bem, não coloque todos juntos): 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈
+    OBRIGATÓRIO 3: "personagem_referencia" DEVE SER um personagem FICTÍCIO REAL de cinema (ex: Joel Barish, Tyler Durden). NUNCA use metáforas idiotas como "Seu próprio ego" ou "Você mesmo".
+    OBRIGATÓRIO 4: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS EXATO para a API do pôster achar (ex: "Eternal Sunshine of the Spotless Mind", nunca traduza os nomes aqui).
+    OBRIGATÓRIO 5 (CRÍTICO): Na "descricao", MANTENHA OS NOMES DOS FILMES EXATAMENTE COMO FORAM FORNECIDOS (EM INGLÊS). NUNCA TENTE TRADUZIR OS TÍTULOS PARA O PORTUGUÊS.
+
+    É OBRIGATÓRIO responder APENAS em JSON estruturado, sem nenhum markdown ou conversinha solta antes ou depois:
     {{
       "titulo": "O Cult de Taubaté 💅",
       "personagem_referencia": "Joel Barish",
       "filme_referencia": "Eternal Sunshine of the Spotless Mind",
-      "descricao": "Texto aqui"
+      "descricao": "Mano, você tá lá pagando de cult dizendo que a Marvel acabou com o cinema, mas a sua média de notas entrega que você dá 5 estrelas pra qualquer romcom adolescente genérica tipo 'White Chicks' 😭. Essa sua lista de favoritos com 'Grown Ups 2' é um pedido de socorro emocional disfarçado de curadoria indie 💀🤌. Sai um pouco do Letterboxd e vai tocar numa grama 🙄💅."
     }}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -251,7 +253,7 @@ def gerar_perfil():
             "titulo": "O Indecifrável 🤓",
             "personagem_referencia": "HAL 9000",
             "filme_referencia": "2001: A Space Odyssey",
-            "descricao": "Seu gosto é tão caótico que a minha IA simplesmente desistiu de viver e pediu demissão 💀. Melhore, por favor 🙄."
+            "descricao": "O teu gosto é tão caótico que a minha IA simplesmente desistiu de viver e pediu demissão 💀. Dar notas a filmes é a tua paixão, mas a coerência mandou lembranças 😭💅. Melhore, por favor 🙄."
         })
 
 @app.route('/oraculo', methods=['GET'])
@@ -284,22 +286,25 @@ def oraculo():
             ]
             tema_escolhido = random.choice(temas_aleatorios)
 
-            prompt = f"""Atue como um curador de cinema focado em OBRAS-PRIMAS. O usuário amou: {amados_amostra}. Odiou: {odiados_amostra}.
+            # ORÁCULO TAMBÉM GANHOU SARCASMO E EMOJIS AGORA!
+            prompt = f"""Atue como um curador de cinema SNOB, DEBOCHADO e cronicamente online do Letterboxd. O usuário amou: {amados_amostra}. Odiou: {odiados_amostra}.
             Recomende EXATAMENTE 15 filmes EXCEPCIONAIS (Nota média > 4.0) que ele provavelmente ainda não viu.
-            PROIBIDO RECOMENDAR FILMES RUINS, MEDÍOCRES OU "LADO B" DESCONHECIDOS. Escolha filmes amplamente aclamados e imperdíveis.
-            
             DIRETRIZ DE CURADORIA: {tema_escolhido}
+            
+            REGRA CRÍTICA 1: O usuário é um suposto "cinéfilo". Ele JÁ VIU todos os filmes óbvios! 
+            É ABSOLUTAMENTE PROIBIDO recomendar megaproduções, franquias famosas ou escolhas óbvias do Top 250 do IMDb (EXEMPLOS PROIBIDOS: O Senhor dos Anéis, Star Wars, Harry Potter, Matrix, Clube da Luta, O Poderoso Chefão, Interestelar, Batman, Marvel).
+            Esforce-se para trazer filmes aclamados (nota > 4.0), mas que sejam ligeiramente menos populares ou filmes internacionais maravilhosos.
 
-            REGRAS DE FORMATO:
+            REGRAS DE FORMATO (OBRIGATÓRIO):
             1. "rec_original": Título original do filme em INGLÊS.
             2. "rec": MESMO TÍTULO EM INGLÊS.
-            3. "base": Uma definição de gênero/vibe bem descritiva (ex: "Thriller Psicológico Obscuro", "Ficção Científica Épica"). (Máximo 4 palavras)
-            4. "desc": Uma sinopse envolvente e empolgante que venda o filme (aproximadamente 15 a 20 palavras). PT-BR.
+            3. "base": Uma definição de gênero/vibe sarcástica (ex: "Filme de gente triste 🚬"). (Máximo 5 palavras).
+            4. "desc": Uma sinopse que venda o filme, mas que tenha o SEU TOM DEBOCHADO E IRÔNICO. Use gírias do Letterboxd ("mano", "literalmente cinema", "saca") e tempere com emojis (🙄💀💅🤌🔥🤓). (Aproximadamente 15 a 25 palavras). PT-BR.
 
             É OBRIGATÓRIO responder APENAS em JSON estruturado:
             {{
               "recomendacoes": [
-                {{"rec_original": "Prisoners", "rec": "Prisoners", "ano": 2013, "base": "Suspense Policial Intenso", "desc": "Um pai desesperado cruza todos os limites éticos para encontrar sua filha sequestrada neste thriller brilhante e asfixiante."}}
+                {{"rec_original": "Prisoners", "rec": "Prisoners", "ano": 2013, "base": "Suspense pra traumatizar 💀", "desc": "Mano, um pai coringando pra achar a filha sequestrada. É literalmente cinema puro e asfixiante, vai te deixar em choque 🤌💅."}}
               ]
             }}"""
             
