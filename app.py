@@ -126,6 +126,11 @@ def tmdb_search():
 def index():
     return render_template('index.html')
 
+# Rota super leve apenas para o UptimeRobot bater e manter o servidor acordado
+@app.route('/ping')
+def ping():
+    return "Pong! Servidor acordado.", 200
+
 @app.route('/dados')
 def dados():
     if not os.path.exists(ARQUIVO_DADOS):
