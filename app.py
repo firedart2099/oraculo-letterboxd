@@ -9,6 +9,9 @@ import re
 import threading
 import subprocess
 import platform
+import webbrowser
+import sqlite3
+import concurrent.futures
 from flask import Flask, render_template, request, jsonify, Response
 from urllib.parse import quote
 from dotenv import load_dotenv
@@ -17,46 +20,90 @@ load_dotenv()
 
 app = Flask(__name__)
 ARQUIVO_FRASES = "frases.txt" 
-ARQUIVO_PERFIS = "perfis.json"
-ARQUIVO_CREDITOS = "creditos.json"
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+DB_NAME = "oraculo.db"
 
-# === SISTEMA DE SESSÕES ISOLADAS ===
-# Agora cada utilizador tem os seus próprios ficheiros para não haver conflitos!
-def get_session_file(session_id, prefix):
-    sid = re.sub(r'\W+', '', str(session_id))
-    if not sid: sid = "default"
-    return f"{prefix}_{sid}.json"
+# ==========================================
+# CONFIGURAÇÃO DO BANCO DE DADOS SQLITE
+# ==========================================
+def get_db():
+    conn = sqlite3.connect(DB_NAME, timeout=15)
+    conn.row_factory = sqlite3.Row
+    return conn
 
+def init_db():
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS sessions
+                     (session_id TEXT PRIMARY KEY, vistos TEXT, amados TEXT, odiados TEXT, watchlist TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS progress
+                     (session_id TEXT PRIMARY KEY, atual INTEGER, total INTEGER, finalizado INTEGER, filme_atual TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS credits
+                     (ip TEXT PRIMARY KEY, creditos INTEGER)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS global_cache
+                     (chave TEXT PRIMARY KEY, streamings TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS dados_finais
+                     (session_id TEXT PRIMARY KEY, dados TEXT)''')
+        conn.commit()
+
+init_db()
+
+# ==========================================
+# FUNÇÕES DE ESTADO (BANCO DE DADOS)
+# ==========================================
 def set_progresso(session_id, atual, total, finalizado, filme_atual):
-    arq = get_session_file(session_id, 'progresso')
-    try:
-        with open(arq, 'w', encoding='utf-8') as f:
-            json.dump({"atual": atual, "total": total, "finalizado": finalizado, "filme_atual": filme_atual}, f)
-    except: pass
+    with get_db() as conn:
+        conn.execute('''INSERT OR REPLACE INTO progress (session_id, atual, total, finalizado, filme_atual)
+                        VALUES (?, ?, ?, ?, ?)''', (session_id, atual, total, int(finalizado), filme_atual))
 
 def get_progresso(session_id):
-    arq = get_session_file(session_id, 'progresso')
-    try:
-        with open(arq, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM progress WHERE session_id = ?', (session_id,)).fetchone()
+        if row:
+            return {"atual": row['atual'], "total": row['total'], "finalizado": bool(row['finalizado']), "filme_atual": row['filme_atual']}
         return {"atual": 0, "total": 0, "finalizado": False, "filme_atual": "Aguardando..."}
 
-def garantir_arquivos_externos():
-    if not os.path.exists(ARQUIVO_FRASES):
-        with open(ARQUIVO_FRASES, 'w', encoding='utf-8') as f:
-            f.write("Cruzando as tuas notas com o watched.csv...\nVasculhando o submundo do cinema cult...\nEvitando os filmes que já viste...")
-    if not os.path.exists(ARQUIVO_PERFIS):
-        with open(ARQUIVO_PERFIS, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-    if not os.path.exists(ARQUIVO_CREDITOS):
-        with open(ARQUIVO_CREDITOS, 'w', encoding='utf-8') as f:
-            json.dump({}, f)
+def salvar_sessao(session_id, vistos, amados, odiados, watchlist):
+    with get_db() as conn:
+        conn.execute('''INSERT OR REPLACE INTO sessions (session_id, vistos, amados, odiados, watchlist)
+                        VALUES (?, ?, ?, ?, ?)''', 
+                        (session_id, json.dumps(vistos), json.dumps(amados), json.dumps(odiados), json.dumps(watchlist)))
 
-garantir_arquivos_externos()
+def carregar_sessao(session_id):
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM sessions WHERE session_id = ?', (session_id,)).fetchone()
+        if row:
+            return {
+                'vistos': json.loads(row['vistos']),
+                'amados': json.loads(row['amados']),
+                'odiados': json.loads(row['odiados']),
+                'watchlist': json.loads(row['watchlist'])
+            }
+        return None
+
+def get_cache_streamings(chave):
+    with get_db() as conn:
+        row = conn.execute('SELECT streamings FROM global_cache WHERE chave = ?', (chave,)).fetchone()
+        if row:
+            return json.loads(row['streamings'])
+        return None
+
+def set_cache_streamings(chave, streamings):
+    with get_db() as conn:
+        conn.execute('INSERT OR REPLACE INTO global_cache (chave, streamings) VALUES (?, ?)', (chave, json.dumps(streamings)))
+
+def salvar_dados_finais(session_id, dados):
+    with get_db() as conn:
+        conn.execute('INSERT OR REPLACE INTO dados_finais (session_id, dados) VALUES (?, ?)', (session_id, json.dumps(dados)))
+
+def get_dados_finais(session_id):
+    with get_db() as conn:
+        row = conn.execute('SELECT dados FROM dados_finais WHERE session_id = ?', (session_id,)).fetchone()
+        if row:
+            return json.loads(row['dados'])
+        return {}
 
 def get_ip():
     if request.environ.get('HTTP_X_FORWARDED_FOR') is None:
@@ -64,42 +111,61 @@ def get_ip():
     else:
         return request.environ['HTTP_X_FORWARDED_FOR'].split(',')[0]
 
-def ler_creditos():
-    try:
-        with open(ARQUIVO_CREDITOS, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return {}
+# --- EXTRATOR DE LINKS BOXD.IT APRIMORADO ---
+def resolve_boxd_links(links_str):
+    if pd.isna(links_str) or not str(links_str).strip():
+        return []
+    urls = [url.strip() for url in str(links_str).split(',') if url.strip()]
+    filmes = []
+    for url in urls:
+        try:
+            res = requests.head(url, allow_redirects=True, timeout=3)
+            partes = res.url.strip('/').split('/')
+            if 'film' in partes:
+                slug = partes[partes.index('film') + 1]
+                # FIX DO PERFECT DAYS: Remove " -2023 " ou qualquer ano colado no fim do link
+                slug = re.sub(r'-\d{4}$', '', slug)
+                filmes.append(slug.replace('-', ' ').title())
+        except: pass
+    return filmes
 
-def salvar_creditos(dados):
-    with open(ARQUIVO_CREDITOS, 'w', encoding='utf-8') as f:
-        json.dump(dados, f)
-
+# ==========================================
+# ROTAS DA API & FRONTEND
+# ==========================================
 @app.route('/api/creditos', methods=['GET'])
 def check_creditos():
     ip = get_ip()
-    db = ler_creditos()
-    if ip not in db:
-        db[ip] = 1 
-        salvar_creditos(db)
-    return jsonify({"creditos": db[ip]})
+    with get_db() as conn:
+        row = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()
+        if not row:
+            conn.execute('INSERT INTO credits (ip, creditos) VALUES (?, ?)', (ip, 1))
+            conn.commit()
+            return jsonify({"creditos": 1})
+        return jsonify({"creditos": row['creditos']})
 
 @app.route('/api/consumir_credito', methods=['POST'])
 def consume_credito():
     ip = get_ip()
-    db = ler_creditos()
-    if ip in db and db[ip] > 0:
-        db[ip] -= 1
-        salvar_creditos(db)
-        return jsonify({"sucesso": True, "creditos": db[ip]})
+    with get_db() as conn:
+        row = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()
+        if row and row['creditos'] > 0:
+            conn.execute('UPDATE credits SET creditos = creditos - 1 WHERE ip = ?', (ip,))
+            conn.commit()
+            return jsonify({"sucesso": True, "creditos": row['creditos'] - 1})
     return jsonify({"sucesso": False, "erro": "Sem créditos"}), 403
 
 @app.route('/api/adicionar_credito', methods=['POST'])
 def add_credito():
     ip = get_ip()
-    db = ler_creditos()
-    db[ip] = db.get(ip, 0) + 1
-    salvar_creditos(db)
-    return jsonify({"sucesso": True, "creditos": db[ip]})
+    with get_db() as conn:
+        row = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()
+        if row:
+            conn.execute('UPDATE credits SET creditos = creditos + 1 WHERE ip = ?', (ip,))
+        else:
+            conn.execute('INSERT INTO credits (ip, creditos) VALUES (?, ?)', (ip, 1))
+        conn.commit()
+        novo_saldo = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()['creditos']
+    return jsonify({"sucesso": True, "creditos": novo_saldo})
 
 @app.route('/api/tmdb/search', methods=['GET'])
 def tmdb_search():
@@ -122,18 +188,15 @@ def ping():
 @app.route('/dados')
 def dados():
     session_id = request.args.get('session_id', 'default')
-    arq = get_session_file(session_id, 'dados')
-    if not os.path.exists(arq):
-        return jsonify({})
-    with open(arq, 'r', encoding='utf-8') as f:
-        return jsonify(json.load(f))
+    return jsonify(get_dados_finais(session_id))
 
 @app.route('/frases')
 def get_frases():
     try:
         with open(ARQUIVO_FRASES, 'r', encoding='utf-8') as f:
             return jsonify([linha.strip() for linha in f.readlines() if linha.strip()])
-    except: return jsonify(["Analisando catálogos..."])
+    except: 
+        return jsonify(["Analisando a sua curadoria..."])
 
 @app.route('/progress')
 def route_get_progress():
@@ -149,7 +212,14 @@ def upload_profile():
     session_id = request.form.get('session_id', 'default')
     
     try:
-        stats_usuario = {"total_avaliados": 0, "media_notas": 0, "favoritos": []}
+        stats_usuario = {
+            "total_avaliados": 0, 
+            "media_notas": 0, 
+            "favoritos": [], 
+            "username": "", 
+            "bio": "", 
+            "profile_favorites": []
+        }
         vistos_temp = set()
         amados_temp = []
         odiados_temp = []
@@ -157,6 +227,17 @@ def upload_profile():
         
         if file.filename.lower().endswith('.zip'):
             with zipfile.ZipFile(file, 'r') as z:
+                if 'profile.csv' in z.namelist():
+                    with z.open('profile.csv') as f_profile:
+                        df_p = pd.read_csv(f_profile)
+                        if not df_p.empty:
+                            row = df_p.iloc[0]
+                            stats_usuario["username"] = str(row.get("Username", ""))
+                            bio_raw = str(row.get("Bio", ""))
+                            stats_usuario["bio"] = re.sub(r'<[^>]+>', '', bio_raw) if bio_raw != 'nan' else ""
+                            fav_links = str(row.get("Favorite Films", ""))
+                            stats_usuario["profile_favorites"] = resolve_boxd_links(fav_links)
+                
                 if 'watched.csv' in z.namelist():
                     with z.open('watched.csv') as f_watched:
                         df_w = pd.read_csv(f_watched)
@@ -189,14 +270,7 @@ def upload_profile():
                         vistos_temp.update(df_watch['Name'].fillna("").str.lower().tolist())
                         watchlist_temp = df_watch[['Name', 'Year']].fillna("").to_dict('records')
 
-        arq_sessao = get_session_file(session_id, 'sessao')
-        with open(arq_sessao, 'w', encoding='utf-8') as f:
-            json.dump({
-                "vistos": list(vistos_temp),
-                "amados": amados_temp,
-                "odiados": odiados_temp,
-                "watchlist": watchlist_temp
-            }, f)
+        salvar_sessao(session_id, list(vistos_temp), amados_temp, odiados_temp, watchlist_temp)
                         
         return jsonify({'stats': stats_usuario})
     except Exception as e: 
@@ -211,27 +285,36 @@ def gerar_perfil():
 
     favoritos_nomes = [f['Name'] for f in stats.get('favoritos', [])]
     
-    # PROMPT 1: PERFIL SARCÁSTICO, DEBOCHADO E COM EMOJIS (EXATAMENTE COMO VOCÊ PEDIU)
-    prompt = f"""Atue como aquele seu amigo cinéfilo cronicamente online do Letterboxd, que é extremamente irônico, debochado, mas no fundo fala umas verdades que doem na alma. Você vai analisar e destruir o ego deste usuário com base nestes dados:
+    prompt = f"""Atue como um crítico de cinema com dupla personalidade. A sua missão é analisar o perfil deste utilizador do Letterboxd.
+    
+    DADOS PESSOAIS (USE ISSO PARA A ANÁLISE):
+    - Username: {stats.get('username', 'Cinéfilo')}
+    - Bio do perfil: "{stats.get('bio', 'Sem bio')}"
+    - Os 4 Filmes Favoritos: {', '.join(stats.get('profile_favorites', ['Nenhum']))}
+    
+    ESTATÍSTICAS GERAIS:
     - Total de filmes vistos: {stats.get('total_avaliados', 0)}
     - Média de notas (de 0 a 5): {stats.get('media_notas', 0)}
-    - Filmes favoritos (nota máxima): {', '.join(favoritos_nomes)}
+    - Outros filmes que ele deu nota altíssima: {', '.join(favoritos_nomes[:10])}
 
-    Crie um "Perfil Psicológico" hilário, que faça a pessoa ler e pensar "meu deus do céu, esse sou literalmente eu kkkkk 💀". 
-    A "descricao" TEM QUE SER um parágrafo longo, robusto (cerca de 5 a 8 linhas). Aponte o dedo para as contradições bizarras e ridículas dele (tipo pagar de intelectual de cinema europeu mas dar 5 estrelas pra comédias de gosto duvidoso e blockbusters). Julgue sem dó, com muito deboche, mas de forma carismática.
+    Crie um "Perfil Psicológico" com EXATAMENTE DOIS PARÁGRAFOS na chave "descricao" (separe-os usando \\n\\n):
+    
+    PARÁGRAFO 1 (O Deboche Cronicamente Online): Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que ela escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas dela. Use um humor fino e irônico.
+    
+    PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda. Mostre que, lendo as entrelinhas da Bio e dos favoritos, você enxerga uma alma sensível. Elogie a forma como ela usa o cinema como catarse. 
+    
+    REGRA DE EMOJIS (MUITO IMPORTANTE): Em AMBOS OS PARÁGRAFOS (tanto no debochado quanto no poético), você DEVE temperar o texto usando EXCLUSIVAMENTE ALGUNS destes emojis específicos: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈. A graça é exatamente essa: falar coisas lindíssimas e sensíveis no segundo parágrafo, mas continuar a pontuar com emojis dramáticos e caóticos de deboche (ex: "...sua busca genuína por beleza e significado 😭💅").
 
-    OBRIGATÓRIO 1: Escreva em Português do Brasil (PT-BR) bem informal, como se fosse um tweet viral ("tá", "mano", "tipo isso", "né", "saca").
-    OBRIGATÓRIO 2: Tempere o texto da "descricao" usando APENAS e EXCLUSIVAMENTE alguns destes emojis específicos (espalhe bem, não coloque todos juntos): 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈
-    OBRIGATÓRIO 3: "personagem_referencia" DEVE SER um personagem FICTÍCIO REAL de cinema (ex: Joel Barish, Tyler Durden). NUNCA use metáforas idiotas como "Seu próprio ego" ou "Você mesmo".
-    OBRIGATÓRIO 4: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS EXATO para a API do pôster achar (ex: "Eternal Sunshine of the Spotless Mind", nunca traduza os nomes aqui).
-    OBRIGATÓRIO 5 (CRÍTICO): Na "descricao", MANTENHA OS NOMES DOS FILMES EXATAMENTE COMO FORAM FORNECIDOS (EM INGLÊS). NUNCA TENTE TRADUZIR OS TÍTULOS PARA O PORTUGUÊS.
+    REGRA CRÍTICA 1: "personagem_referencia" DEVE SER um personagem FICTÍCIO REAL de cinema.
+    REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
+    REGRA CRÍTICA 3: MANTENHA OS NOMES DOS FILMES EM INGLÊS E NÃO OS TRADUZA.
 
-    É OBRIGATÓRIO responder APENAS em JSON estruturado, sem nenhum markdown ou conversinha solta antes ou depois:
+    É OBRIGATÓRIO responder APENAS em JSON estruturado:
     {{
-      "titulo": "O Cult de Taubaté 💅",
-      "personagem_referencia": "Joel Barish",
-      "filme_referencia": "Eternal Sunshine of the Spotless Mind",
-      "descricao": "Mano, você tá lá pagando de cult dizendo que a Marvel acabou com o cinema, mas a sua média de notas entrega que você dá 5 estrelas pra qualquer romcom adolescente genérica tipo 'White Chicks' 😭. Essa sua lista de favoritos com 'Grown Ups 2' é um pedido de socorro emocional disfarçado de curadoria indie 💀🤌. Sai um pouco do Letterboxd e vai tocar numa grama 🙄💅."
+      "titulo": "O Romântico Disfarçado de Cínico 💅",
+      "personagem_referencia": "Lady Bird",
+      "filme_referencia": "Lady Bird",
+      "descricao": "É lindíssimo ver o esforço que você faz para manter essa curadoria de intelectual 🤓. Você ostenta 'Come and See' na vitrine, implorando por validação 🤌. Só que a sua média de notas expõe que a sua verdadeira paz está em chorar com farofa de estúdio 😭. Essa tentativa desesperada de misturar alta cultura com comédia genérica é um pedido de socorro 💀💅.\\n\\nMas, tirando a armadura de ironia, a verdade é que o seu amor pelo cinema é incrivelmente puro e visceral 😭. Ao olhar os seus favoritos, nota-se uma busca genuína por afeto e beleza nas frestas da vida 🥺🤌. Você não assiste a filmes apenas para preencher listas, mas para preencher a alma 💀. A sua curadoria revela alguém que ainda acredita na magia de uma tela grande e se permite ser profundamente tocado, quebrado e curado pelas histórias 🫦🔥."
     }}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -250,21 +333,18 @@ def gerar_perfil():
         raise Exception("Falha na API da Groq")
     except Exception as e:
         return jsonify({
-            "titulo": "O Indecifrável 🤓",
+            "titulo": "O Erro 404 da Estética 🤓",
             "personagem_referencia": "HAL 9000",
             "filme_referencia": "2001: A Space Odyssey",
-            "descricao": "O teu gosto é tão caótico que a minha IA simplesmente desistiu de viver e pediu demissão 💀. Dar notas a filmes é a tua paixão, mas a coerência mandou lembranças 😭💅. Melhore, por favor 🙄."
+            "descricao": "A sua lista de filmes é tão caótica que o algoritmo simplesmente desistiu de procurar coerência e pediu demissão 💀. A tentativa de misturar a alta cultura com blockbusters genéricos resultou numa falha crítica no meu sistema. Vai ler um livro 🙄.\n\nMas brincadeiras à parte, algo na sua conexão com o cinema foi tão intenso que quebrou nossos circuitos 😭💅. Continue amando filmes de forma inexplicável 🥺🤌."
         })
 
-@app.route('/oraculo', methods=['GET'])
+@app.route('/oraculo', methods=['GET', 'POST'])
 def oraculo():
     session_id = request.args.get('session_id', 'default')
-    arq_sessao = get_session_file(session_id, 'sessao')
+    sessao = carregar_sessao(session_id)
     
-    try:
-        with open(arq_sessao, 'r', encoding='utf-8') as f:
-            sessao = json.load(f)
-    except:
+    if not sessao:
         return jsonify({"erro": "Dados da sessão não encontrados"}), 400
         
     try:
@@ -274,6 +354,12 @@ def oraculo():
         
         amados_amostra = random.sample(amados, min(8, len(amados))) if amados else ["Bons filmes"]
         odiados_amostra = random.sample(odiados, min(4, len(odiados))) if odiados else ["Filmes maus"]
+
+        top_4_favorites = request.json.get('favorites', []) if request.is_json else []
+        filmes_ja_recomendados = request.json.get('exclude', []) if request.is_json else []
+        
+        top_4_texto = f"- TOP 4 FAVORITOS ABSOLUTOS DO PERFIL: {', '.join(top_4_favorites)}" if top_4_favorites else ""
+        texto_exclusao = f"REGRA CRÍTICA (IGNORAR ESTES): É PROIBIDO recomendar os seguintes filmes, pois você JÁ os recomendou nesta sessão: {', '.join(filmes_ja_recomendados)}" if filmes_ja_recomendados else ""
 
         if GROQ_API_KEY:
             temas_aleatorios = [
@@ -286,14 +372,22 @@ def oraculo():
             ]
             tema_escolhido = random.choice(temas_aleatorios)
 
-            # PROMPT 2: ORÁCULO SÉRIO, PROFISSIONAL E ANTI-BLOCKBUSTERS (ÓBVIOS)
-            prompt = f"""Atue como um curador de cinema focado em OBRAS-PRIMAS. O usuário amou: {amados_amostra}. Odiou: {odiados_amostra}.
-            Recomende EXATAMENTE 15 filmes EXCEPCIONAIS (Nota média > 4.0) que ele provavelmente ainda não viu.
-            DIRETRIZ DE CURADORIA: {tema_escolhido}
+            prompt = f"""Atue como um curador de cinema profissional e focado em OBRAS-PRIMAS. 
             
-            REGRA CRÍTICA (NÃO IGNORE): O usuário é um CINÉFILO HARDCORE. Ele JÁ VIU todos os filmes óbvios! 
-            É ABSOLUTAMENTE PROIBIDO recomendar megaproduções, franquias famosas ou escolhas óbvias do Top 250 do IMDb (EXEMPLOS PROIBIDOS: O Senhor dos Anéis, Star Wars, Harry Potter, Matrix, Clube da Luta, O Poderoso Chefão, Interestelar, Batman, Marvel).
-            Esforce-se para trazer filmes aclamados (nota > 4.0), mas que sejam ligeiramente menos populares ou filmes internacionais maravilhosos.
+            DADOS DE GOSTO DO USUÁRIO:
+            {top_4_texto}
+            - Outros filmes que amou (nota máxima): {amados_amostra}
+            - Filmes que odiou (nota baixa): {odiados_amostra}
+
+            Recomende EXATAMENTE 15 filmes EXCEPCIONAIS (Nota média > 4.0) que o usuário provavelmente ainda não viu.
+            
+            DIRETRIZ DE CURADORIA MESTRE: Analise os TOP 4 FAVORITOS do usuário (se houver). Extraia a essência, a atmosfera e os temas predominantes desses 4 filmes e use isso como base principal para as recomendações. Cruze essa essência com: {tema_escolhido}
+            
+            REGRA CRÍTICA 1: O usuário é um CINÉFILO HARDCORE. Ele JÁ VIU todos os filmes óbvios! 
+            É ABSOLUTAMENTE PROIBIDO recomendar megaproduções, franquias famosas ou escolhas óbvias do Top 250 do IMDb (EXEMPLOS PROIBIDOS: O Senhor dos Anéis, Star Wars, Harry Potter, Matrix, Clube da Luta, O Poderoso Chefão, Interestelar, Batman, Marvel, Tarantino, Nolan).
+            Esforce-se para trazer filmes aclamados (nota > 4.0), mas que sejam tesouros escondidos, cinema independente brilhante ou obras internacionais maravilhosas.
+            
+            {texto_exclusao}
 
             REGRAS DE FORMATO (OBRIGATÓRIO):
             1. "rec_original": Título original do filme em INGLÊS.
@@ -323,10 +417,13 @@ def oraculo():
                 recs_ia = dados_json.get("recomendacoes", [])
                 if len(recs_ia) > 0:
                     recs_ineditas = []
+                    filmes_ja_recomendados_lower = [f.lower() for f in filmes_ja_recomendados]
                     for r in recs_ia:
                         n_orig = r.get('rec_original', '').lower()
                         n_pt = r.get('rec', '').lower()
-                        if n_orig not in vistos_globais and n_pt not in vistos_globais:
+                        n_rec = r.get('rec', '').lower()
+                        
+                        if n_orig not in vistos_globais and n_pt not in vistos_globais and n_rec not in filmes_ja_recomendados_lower:
                             recs_ineditas.append(r)
                     return jsonify({"recomendacoes": recs_ineditas})
 
@@ -336,46 +433,51 @@ def oraculo():
 def processar_em_segundo_plano(watchlist_data, session_id):
     dados_filmes = {}
     total = len(watchlist_data)
+    atual = 0
     
+    def fetch_movie(row):
+        filme = row.get('Name', '')
+        ano = row.get('Year', '')
+        chave = f"{filme} ({ano})"
+        
+        cached_streamings = get_cache_streamings(chave)
+        if cached_streamings: return chave, cached_streamings
+        
+        streamings = []
+        try:
+            search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={quote(filme)}&language=pt-BR"
+            if ano and str(ano).isdigit(): search_url += f"&year={int(float(ano))}"
+            
+            res_search = requests.get(search_url, timeout=5).json()
+            if res_search.get('results'):
+                movie_id = res_search['results'][0]['id']
+                prov_url = f"https://api.themoviedb.org/3/movie/{movie_id}/watch/providers?api_key={TMDB_API_KEY}"
+                prov_res = requests.get(prov_url, timeout=5).json()
+                br_data = prov_res.get('results', {}).get('BR', {})
+                
+                for cat in ['flatrate', 'free', 'ads']:
+                    if cat in br_data:
+                        for provider in br_data[cat]:
+                            nome = provider.get('provider_name')
+                            if nome and nome not in streamings:
+                                streamings.append(nome)
+        except Exception as e: pass
+        
+        if not streamings: streamings.append("Não disponível")
+        set_cache_streamings(chave, streamings)
+        return chave, streamings
+        
     try:
-        for index, row in enumerate(watchlist_data):
-            filme = row.get('Name', '')
-            ano = row.get('Year', '')
-            chave = f"{filme} ({ano})"
-            streamings = []
-            
-            set_progresso(session_id, index + 1, total, False, chave)
-            
-            try:
-                time.sleep(0.15) 
-                search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={quote(filme)}&language=pt-BR"
-                if ano and str(ano).isdigit(): search_url += f"&year={int(float(ano))}"
-                
-                res_search = requests.get(search_url, timeout=5).json()
-                
-                if res_search.get('results'):
-                    movie_id = res_search['results'][0]['id']
-                    prov_url = f"https://api.themoviedb.org/3/movie/{movie_id}/watch/providers?api_key={TMDB_API_KEY}"
-                    prov_res = requests.get(prov_url, timeout=5).json()
-                    br_data = prov_res.get('results', {}).get('BR', {})
-                    
-                    for cat in ['flatrate', 'free', 'ads']:
-                        if cat in br_data:
-                            for provider in br_data[cat]:
-                                nome = provider.get('provider_name')
-                                if nome and nome not in streamings:
-                                    streamings.append(nome)
-            except Exception as e: pass
-            
-            if not streamings: streamings.append("Não disponível")
-            dados_filmes[chave] = streamings
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(fetch_movie, row): row for row in watchlist_data}
+            for future in concurrent.futures.as_completed(futures):
+                chave, streamings = future.result()
+                dados_filmes[chave] = streamings
+                atual += 1
+                set_progresso(session_id, atual, total, False, chave)
         
         dados_finais = {"stats": {}, "watchlist": dados_filmes}
-        arq_dados = get_session_file(session_id, 'dados')
-        
-        with open(arq_dados, 'w', encoding='utf-8') as f:
-            json.dump(dados_finais, f, ensure_ascii=False, indent=4)
-            
+        salvar_dados_finais(session_id, dados_finais)
         set_progresso(session_id, total, total, True, "Finalizado!")
         
     except Exception as e:
@@ -385,16 +487,12 @@ def processar_em_segundo_plano(watchlist_data, session_id):
 def process_watchlist():
     req_data = request.json or {}
     session_id = req_data.get('session_id', 'default')
-    arq_sessao = get_session_file(session_id, 'sessao')
+    sessao = carregar_sessao(session_id)
     
-    try:
-        with open(arq_sessao, 'r', encoding='utf-8') as f:
-            sessao = json.load(f)
-            watchlist_data = sessao.get('watchlist', [])
-    except: return jsonify({'erro': 'A Watchlist não foi carregada.'}), 400
-        
-    if not watchlist_data: return jsonify({'erro': 'Watchlist vazia.'}), 400
+    if not sessao or not sessao.get('watchlist'):
+        return jsonify({'erro': 'A Watchlist não foi carregada ou está vazia.'}), 400
 
+    watchlist_data = sessao.get('watchlist')
     set_progresso(session_id, 0, len(watchlist_data), False, "Ligando os motores...")
     threading.Thread(target=processar_em_segundo_plano, args=(watchlist_data, session_id)).start()
     return jsonify({'mensagem': 'Iniciado'})
