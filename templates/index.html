@@ -294,7 +294,7 @@
 
 <div class="max-w-5xl mx-auto relative z-10">
     <header class="flex justify-between items-start md:items-center mb-8 md:mb-16">
-        <!-- Logo Responsiva: Analyzer em baixo no mobile -->
+        <!-- Logo Responsiva: Analyzer em baixo no mobile e igualado no desktop -->
         <div class="flex items-start sm:items-center gap-2 sm:gap-4 group cursor-pointer shrink-0" onclick="location.reload()">
             <div class="flex items-center gap-1.5 group-hover:scale-110 transition-transform mt-1.5 sm:mt-0">
                 <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#00e054]"></div>
@@ -302,7 +302,7 @@
                 <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ff8000]"></div>
             </div>
             <div class="flex flex-col justify-center">
-                <h1 class="text-sm sm:text-xl font-bold tracking-widest text-white uppercase drop-shadow-md leading-none">Letterboxd <span class="text-[#40bcf4] block sm:inline text-[10px] sm:text-[inherit] mt-0.5 sm:mt-0">Analyzer</span></h1>
+                <h1 class="text-sm sm:text-xl font-bold tracking-widest text-white uppercase drop-shadow-md leading-none">Letterboxd <span class="text-[#40bcf4] block sm:inline text-[10px] sm:text-xl mt-0.5 sm:mt-0">Analyzer</span></h1>
                 <p class="text-[8px] sm:text-[10px] text-[#8c9bab] font-bold tracking-[0.3em] uppercase drop-shadow-md mt-1 sm:mt-0.5">v1.0.0 Oficial</p>
             </div>
         </div>
@@ -360,19 +360,30 @@
                 Ver passo a passo detalhado
             </button>
             
-            <div id="import-tutorial" class="hidden mt-4 p-5 bg-[#1c2228]/95 border border-[#2c3440] rounded-xl text-left text-sm text-gray-300 max-w-lg mx-auto">
+            <div id="import-tutorial" class="hidden mt-4 p-5 bg-[#1c2228]/95 border border-[#2c3440] rounded-xl text-left text-sm text-gray-300 max-w-lg mx-auto shadow-lg">
                 <h4 class="text-white font-black mb-4 uppercase tracking-widest text-xs flex items-center gap-2">
                     <svg class="w-4 h-4 text-[#40bcf4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                     Passo a passo
                 </h4>
                 <div class="space-y-3">
-                    <div class="bg-[#00e054]/10 border border-[#00e054]/30 p-3 rounded-xl text-xs">
-                        <h5 class="text-[#00e054] font-black uppercase mb-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> O Jeito Rápido</h5>
-                        <ol class="space-y-1 list-decimal list-inside marker:text-[#00e054]">
-                            <li>Acesse o botão azul acima ou <a href="https://letterboxd.com/data/export/" target="_blank" class="text-white font-bold underline">aqui</a>.</li>
-                            <li>Faça login na sua conta.</li>
-                            <li>O download do <span class="font-mono">.zip</span> começa na hora!</li>
+                    <div class="bg-[#00e054]/10 border border-[#00e054]/30 p-3 sm:p-4 rounded-xl text-xs">
+                        <h5 class="text-[#00e054] font-black uppercase mb-2 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> O Jeito Rápido</h5>
+                        <ol class="space-y-1.5 list-decimal list-inside marker:text-[#00e054] mb-3">
+                            <li>Acesse o botão azul acima ou clique <a href="https://letterboxd.com/data/export/" target="_blank" class="text-white font-bold underline">aqui</a>.</li>
+                            <li>Faça login apenas se for solicitado (no celular, o botão pode abrir direto no app já logado).</li>
+                            <li>O download do <span class="font-mono text-white">.zip</span> começa na hora!</li>
                         </ol>
+                        
+                        <!-- AVISO DE DEEP LINKING MOBILE PARA COPIAR -->
+                        <div class="mt-3 bg-[#14181c] border border-[#ff8000]/40 p-2 sm:p-3 rounded-lg text-left shadow-inner">
+                            <p class="text-[#ff8000] text-[9px] sm:text-[10px] font-bold mb-1.5 leading-relaxed">
+                                🚨 AVISO (CELULAR): Se o botão abrir o Aplicativo e ficar travado num loop, copie o link abaixo e cole no Chrome ou Safari:
+                            </p>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="export-link-input" readonly value="https://letterboxd.com/data/export/" class="flex-1 bg-transparent text-[#40bcf4] text-[10px] sm:text-xs font-mono outline-none selection:bg-[#40bcf4]/30 px-1">
+                                <button id="copy-link-btn" onclick="copyExportLink()" class="bg-[#2c3440] hover:bg-[#40bcf4] text-white hover:text-[#14181c] text-[9px] font-bold px-2.5 py-1.5 rounded transition-colors uppercase tracking-widest shrink-0">Copiar</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -572,6 +583,15 @@
     ];
 
     let currentIconicIdx = 0;
+
+    function copyExportLink() {
+        const input = document.getElementById('export-link-input');
+        input.select();
+        document.execCommand('copy');
+        const btn = document.getElementById('copy-link-btn');
+        btn.innerText = 'Copiado!';
+        setTimeout(() => { btn.innerText = 'Copiar'; }, 2000);
+    }
 
     function startInitialSlideshow() {
         const heroImg = document.getElementById('hero-backdrop-img');
