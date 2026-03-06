@@ -27,6 +27,7 @@ DB_NAME = "oraculo.db"
 
 # ==========================================
 # GATILHO DE ANIVERSÁRIO DA LAURA
+# (Mude para False amanhã para desativar!)
 # ==========================================
 IS_LAURA_BIRTHDAY_ACTIVE = True
 
@@ -56,17 +57,8 @@ def init_db():
 init_db()
 
 # ==========================================
-# FUNÇÕES DE ESTADO (BANCO DE DADOS) E UTILS
+# FUNÇÕES DE ESTADO (BANCO DE DADOS)
 # ==========================================
-def extract_json_from_text(text):
-    """Caçador de JSON: Arranca apenas o JSON válido do meio do texto da IA"""
-    inicio = text.find('{')
-    fim = text.rfind('}')
-    if inicio != -1 and fim != -1:
-        json_str = text[inicio:fim+1]
-        return json.loads(json_str)
-    raise ValueError("Nenhum bloco JSON válido foi encontrado na resposta da IA.")
-
 def set_progresso(session_id, atual, total, finalizado, filme_atual):
     with get_db() as conn:
         conn.execute('''INSERT OR REPLACE INTO progress (session_id, atual, total, finalizado, filme_atual)
@@ -146,15 +138,26 @@ def resolve_boxd_links(links_str):
 # ==========================================
 @app.route('/api/creditos', methods=['GET'])
 def check_creditos():
+    # Modo ilimitado ativado temporariamente para amigos
     return jsonify({"creditos": 999})
 
 @app.route('/api/consumir_credito', methods=['POST'])
 def consume_credito():
+    # Modo ilimitado ativado temporariamente para amigos
     return jsonify({"sucesso": True, "creditos": 999})
 
 @app.route('/api/adicionar_credito', methods=['POST'])
 def add_credito():
-    return jsonify({"sucesso": True, "creditos": 999})
+    ip = get_ip()
+    with get_db() as conn:
+        row = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()
+        if row:
+            conn.execute('UPDATE credits SET creditos = creditos + 1 WHERE ip = ?', (ip,))
+        else:
+            conn.execute('INSERT INTO credits (ip, creditos) VALUES (?, ?)', (ip, 1))
+        conn.commit()
+        novo_saldo = conn.execute('SELECT creditos FROM credits WHERE ip = ?', (ip,)).fetchone()['creditos']
+    return jsonify({"sucesso": True, "creditos": novo_saldo})
 
 @app.route('/api/tmdb/search', methods=['GET'])
 def tmdb_search():
@@ -281,6 +284,7 @@ def gerar_perfil():
     is_laura = stats.get('is_laura_birthday', False)
     
     if is_laura:
+        # PROMPT EXCLUSIVO DO ANIVERSÁRIO DA LAURA
         prompt = f"""Atue como um melhor amigo dando um presente mágico de aniversário. A usuária se chama Laura (username: lauraamora) e HOJE É O ANIVERSÁRIO DELA!
         
         DADOS DELA:
@@ -290,15 +294,25 @@ def gerar_perfil():
         Sua missão é escrever uma mensagem de FELIZ ANIVERSÁRIO incrivelmente linda, poética e afetuosa. 
         Use os filmes favoritos dela como metáfora para elogiar a pessoa maravilhosa que ela é.
         Crie "DOIS PARÁGRAFOS" (separados por \\n\\n). 
+        - Parágrafo 1: Deseje feliz aniversário, celebre o dia dela e cite como o gosto dela por esses filmes mostra uma alma gigante.
+        - Parágrafo 2: Continue elogiando a sensibilidade dela e deixe claro que esse site é um presente especial só para ela hoje.
         
-        É OBRIGATÓRIO responder APENAS no formato JSON abaixo:
+        REGRA: ZERO DEBOCHE, ZERO SARCASMO! Apenas carinho puro. Use emojis comemorativos (🎂, ✨, 💖, 🎈, 🎬, 🌟).
+        
+        REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática e a legibilidade do texto. Não invente palavras.
+        
+        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER a protagonista do filme favorito dela.
+        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
+        
+        É OBRIGATÓRIO responder APENAS em JSON estruturado:
         {{
           "titulo": "✨ Feliz Aniversário, Laura! 🎂",
-          "personagem_referencia": "[NOME DO PROTAGONISTA AQUI]",
-          "filme_referencia": "[TITULO DO FILME AQUI EM INGLES]",
-          "descricao": "[SEU TEXTO AQUI]"
+          "personagem_referencia": "A Protagonista (Você)",
+          "filme_referencia": "Amelie",
+          "descricao": "Texto gerado aqui..."
         }}"""
     else:
+        # PROMPT NORMAL PARA OS OUTROS USUÁRIOS
         prompt = f"""Atue como um crítico de cinema gen-z cronicamente online.
         DADOS PESSOAIS DO USUÁRIO:
         - Username: {stats.get('username', 'Cinéfilo')}
@@ -312,22 +326,24 @@ def gerar_perfil():
 
         Crie um "Perfil Psicológico" na chave "descricao" com EXATAMENTE DOIS PARÁGRAFOS (separe-os usando \\n\\n):
         
-        PARÁGRAFO 1 (O Deboche Cronicamente Online): Fale DIRETAMENTE com o usuário ("você"). Faça um "roast" sarcástico. Aponte o contraste absurdo entre o que a pessoa escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas que ela tem. Se a pessoa tiver visto poucos filmes ou só filmes esquisitos, zombe disso impiedosamente.
+        PARÁGRAFO 1 (O Deboche Cronicamente Online): Fale DIRETAMENTE com o usuário (use sempre a palavra "você"). Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que a pessoa escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas que ela tem.
+        PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda. Continue falando diretamente com o usuário ("você"). Elogie a forma como o usuário usa o cinema como catarse, buscando beleza e significado. 
         
-        PARÁGRAFO 2 (A Análise Poética Forçada): Mude o tom das palavras. Faça uma análise poética ESTREITAMENTE BASEADA NOS FILMES ESPECÍFICOS QUE O USUÁRIO VIU. INVENTE UMA METÁFORA NOVA! (Ex: se ele só viu filmes de carros, faça uma metáfora sobre "acelerar na estrada da vida"; se viu terror, "enfrentar monstros").
+        REGRA DE GÊNERO: NUNCA assuma o gênero do usuário baseado no nome. Trate o usuário de forma neutra ou diretamente por "você". É ESTRITAMENTE PROIBIDO usar palavras como "rainha", "rei", "ela" ou "ele" para se referir ao usuário.
         
-        REGRA DE GÊNERO: NUNCA assuma o gênero do usuário. Trate-o de forma neutra.
+        REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática, a coesão e a legibilidade do texto. Mantenha um português impecável. NUNCA invente palavras ou gírias que não existem.
         
-        REGRA DE EMOJIS: Use EXCLUSIVAMENTE ALGUNS DESTES: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿😼🤓🙈. Pelo menos 3 em cada parágrafo.
-        
-        REGRA DE COERÊNCIA: O "personagem_referencia" DEVE PERTENCER ao "filme_referencia". O "filme_referencia" deve ser um título original em INGLÊS que o usuário assistiu.
-        
-        É OBRIGATÓRIO responder APENAS no formato JSON abaixo. NÃO ADICIONE NADA FORA DAS CHAVES:
+        REGRA DE EMOJIS: Em AMBOS OS PARÁGRAFOS tempere o texto usando EXCLUSIVAMENTE ALGUNS destes emojis específicos: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈. A graça é falar coisas lindíssimas no segundo parágrafo, mas continuar a pontuar com emojis de deboche (ex: "...sua busca genuína por beleza 😭💅").
+
+        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER um personagem fictício real.
+        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
+
+        É OBRIGATÓRIO responder APENAS em JSON estruturado:
         {{
-          "titulo": "[TITULO SARCASTICO]",
-          "personagem_referencia": "[PERSONAGEM DO FILME]",
-          "filme_referencia": "[FILME ORIGINAL EM INGLES]",
-          "descricao": "[OS DOIS PARAGRAFOS]"
+          "titulo": "A Farsa do Cinema Cult 💅",
+          "personagem_referencia": "Kendall Roy",
+          "filme_referencia": "Drive",
+          "descricao": "Texto gerado aqui..."
         }}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -335,26 +351,22 @@ def gerar_perfil():
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.8
-        # Removido o response_format: {"type": "json_object"} que causava erros severos e bloqueios da API
+        "temperature": 0.7, 
+        "response_format": {"type": "json_object"} 
     }
 
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=30)
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
         if res.status_code == 200:
-            content = res.json()['choices'][0]['message']['content']
-            return jsonify(extract_json_from_text(content))
-        else:
-            print(f"ERRO GROQ (Perfil): {res.status_code} - {res.text}")
-            raise Exception("Falha na API da Groq")
+            return jsonify(json.loads(res.json()['choices'][0]['message']['content']))
+        raise Exception("Falha na API da Groq")
     except Exception as e:
-        print(f"ERRO PYTHON (Perfil): {e}")
         if is_laura:
             return jsonify({
                 "titulo": "✨ Feliz Aniversário, Laura! 🎂",
-                "personagem_referencia": "A Protagonista",
+                "personagem_referencia": "A Protagonista da Própria Vida",
                 "filme_referencia": "La La Land",
-                "descricao": "Opa Laura! Hoje o dia é todo seu! ✨ Até o servidor ficou emocionado... Aproveite o seu presente! 🎈💖"
+                "descricao": "Opa Laura! Hoje o dia é todo seu! ✨ Até o servidor ficou tão emocionado com a sua presença que decidiu pular a análise fria só para te desejar o melhor dia de todos. Que a sua vida continue sendo um roteiro lindo, cheio de amor e trilhas sonoras inesquecíveis. Aproveite o seu presente! 🎈💖"
             })
             
         return jsonify({
@@ -377,33 +389,53 @@ def oraculo():
         odiados = sessao.get('odiados', [])
         vistos_globais = sessao.get('vistos', [])
         
-        amados_amostra = random.sample(amados, min(8, len(amados))) if amados else ["Filmes aleatórios"]
-        odiados_amostra = random.sample(odiados, min(4, len(odiados))) if odiados else ["Nenhum"]
+        amados_amostra = random.sample(amados, min(8, len(amados))) if amados else ["Bons filmes"]
+        odiados_amostra = random.sample(odiados, min(4, len(odiados))) if odiados else ["Filmes maus"]
 
         top_4_favorites = request.json.get('favorites', []) if request.is_json else []
         filmes_ja_recomendados = request.json.get('exclude', []) if request.is_json else []
         
         top_4_texto = f"- TOP 4 FAVORITOS ABSOLUTOS DO PERFIL: {', '.join(top_4_favorites)}" if top_4_favorites else ""
-        texto_exclusao = f"REGRA CRÍTICA: É PROIBIDO recomendar os seguintes filmes, pois você JÁ os recomendou: {', '.join(filmes_ja_recomendados)}" if filmes_ja_recomendados else ""
+        texto_exclusao = f"REGRA CRÍTICA (IGNORAR ESTES): É PROIBIDO recomendar os seguintes filmes, pois você JÁ os recomendou nesta sessão: {', '.join(filmes_ja_recomendados)}" if filmes_ja_recomendados else ""
 
         if GROQ_API_KEY:
-            prompt = f"""Atue como um curador de cinema profissional, focado em entender a vibe EXATA e ESPECÍFICA do usuário. 
+            temas_aleatorios = [
+                "Favoritos do público e da crítica (nota 3.8+ no Letterboxd).",
+                "Grandes filmes de estúdios aclamados como A24, Neon, ou clássicos modernos.",
+                "Thrillers famosos, suspenses e filmes que prendem do início ao fim.",
+                "Comédias, romances ou dramas muito bem avaliados e populares.",
+                "Filmes com elencos estelares e diretores renomados que o usuário pode ter deixado passar.",
+                "Obras que foram um sucesso cultural e pop nos últimos 20 anos."
+            ]
+            tema_escolhido = random.choice(temas_aleatorios)
+
+            prompt = f"""Atue como um curador de cinema profissional, focado em entender a vibe exata do usuário. 
             
             DADOS DE GOSTO DO USUÁRIO:
             {top_4_texto}
             - Outros filmes que amou (nota máxima): {amados_amostra}
             - Filmes que odiou (nota baixa): {odiados_amostra}
 
-            Sua missão é recomendar EXATAMENTE 8 filmes que o usuário provavelmente ainda não viu, MAS QUE SEJAM DO MESMO ESTILO DO QUE ELE ASSISTE.
+            Recomende EXATAMENTE 15 filmes MUITO BONS (Nota média > 3.6) que o usuário provavelmente ainda não viu, MAS QUE COMBINEM COM O GOSTO DELE.
             
-            REGRA 1 - PERSONALIZAÇÃO EXTREMA: O perfil do usuário dita 100% as regras. Se ele só assiste carros, recomende carros ou animações da Pixar. Adapte-se à vibe dele!
-            REGRA 2 - EVITAR MEGA-FRANQUIAS: Evite Marvel, Star Wars, etc, mas pode recomendar sucessos e clássicos aclamados.
+            DIRETRIZ DE CURADORIA MESTRE: Analise os TOP 4 FAVORITOS do usuário. Extraia a essência, os gêneros (ex: comédia, terror, romance, ficção) e a atmosfera deles e use isso como base principal. Cruze essa essência com: {tema_escolhido}
+            
+            REGRA CRÍTICA 1 - PERSONALIZAÇÃO EXTREMA: O perfil do usuário dita as regras. Não empurre filmes obscuros iranianos se ele gosta de comédia romântica ou ação. 
+            
+            REGRA CRÍTICA 2 - FILMES FAMOSOS LIBERADOS: VOCÊ DEVE recomendar filmes populares, aclamados e "famosinhos" do Letterboxd. Pode recomendar grandes sucessos de Hollywood, filmes cult muito conhecidos, sucessos recentes ou clássicos muito amados. Apenas EVITE mega-franquias óbvias (Marvel, DC, Star Wars, Harry Potter, Velozes e Furiosos).
+            
             {texto_exclusao}
 
-            É OBRIGATÓRIO responder APENAS no formato JSON abaixo. GERE SEUS PRÓPRIOS VALORES PARA A LISTA:
+            REGRAS DE FORMATO (OBRIGATÓRIO):
+            1. "rec_original": Título original do filme em INGLÊS.
+            2. "rec": MESMO TÍTULO EM INGLÊS.
+            3. "base": Uma definição de gênero curta (ex: "Thriller Psicológico", "Comédia Romântica"). (Máximo 4 palavras).
+            4. "desc": Uma sinopse chamativa e bem escrita que venda o filme, PT-BR. (Aproximadamente 15 a 25 palavras).
+
+            É OBRIGATÓRIO responder APENAS em JSON estruturado:
             {{
               "recomendacoes": [
-                {{"rec_original": "[TITULO_ORIGINAL]", "rec": "[TITULO_EM_INGLES]", "ano": 2000, "base": "[GENERO MAX 4 PALAVRAS]", "desc": "[SINOPSE MAX 25 PALAVRAS]"}}
+                {{"rec_original": "Gone Girl", "rec": "Gone Girl", "ano": 2014, "base": "Suspense Psicológico Intenso", "desc": "Um homem vê sua vida desmoronar e se torna o principal suspeito quando sua esposa desaparece misteriosamente no dia do aniversário de casamento."}}
               ]
             }}"""
             
@@ -412,33 +444,28 @@ def oraculo():
             payload = {
                 "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.8
+                "temperature": 0.8, 
+                "response_format": {"type": "json_object"} 
             }
             
-            res = requests.post(url, headers=headers, json=payload, timeout=30)
+            res = requests.post(url, headers=headers, json=payload, timeout=20)
             if res.status_code == 200:
-                content = res.json()['choices'][0]['message']['content']
-                dados_json = extract_json_from_text(content)
+                dados_json = json.loads(res.json()['choices'][0]['message']['content'])
                 recs_ia = dados_json.get("recomendacoes", [])
-                
                 if len(recs_ia) > 0:
                     recs_ineditas = []
                     filmes_ja_recomendados_lower = [f.lower() for f in filmes_ja_recomendados]
                     for r in recs_ia:
-                        n_orig = str(r.get('rec_original', '')).lower()
-                        n_pt = str(r.get('rec', '')).lower()
-                        n_rec = str(r.get('rec', '')).lower()
+                        n_orig = r.get('rec_original', '').lower()
+                        n_pt = r.get('rec', '').lower()
+                        n_rec = r.get('rec', '').lower()
                         
                         if n_orig not in vistos_globais and n_pt not in vistos_globais and n_rec not in filmes_ja_recomendados_lower:
                             recs_ineditas.append(r)
                     return jsonify({"recomendacoes": recs_ineditas})
-            else:
-                print(f"ERRO GROQ (Oraculo): {res.status_code} - {res.text}")
 
         return jsonify({"recomendacoes": []})
-    except Exception as e: 
-        print(f"ERRO PYTHON (Oraculo): {e}")
-        return jsonify({"erro": "Falha", "recomendacoes": []})
+    except Exception as e: return jsonify({"erro": "Falha", "recomendacoes": []})
 
 def processar_em_segundo_plano(watchlist_data, session_id):
     dados_filmes = {}
