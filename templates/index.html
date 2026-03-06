@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oráculo de Streaming | Letterboxd Analyzer</title>
     
-    <!-- VOLTAMOS AO CDN MÁGICO: Não precisas do Node.js! -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
@@ -31,7 +30,6 @@
 
         h1, h2, h3, .stat-value { font-family: 'Space Grotesk', sans-serif; }
 
-        /* OPTIMIZAÇÃO MOBILE: Blur apenas no Desktop para salvar bateria/FPS */
         .glass-panel {
             background: rgba(28, 34, 40, 0.95);
             border: 1px solid var(--border-color);
@@ -218,6 +216,7 @@
     <div id="countdown-text" class="countdown-number">3</div>
 </div>
 
+<!-- Modal de Tutorial Reduzido (apenas para exportar de volta ao Letterboxd) -->
 <div id="tutorial-modal" class="fixed inset-0 bg-[#14181c]/90 z-[10000] hidden items-center justify-center backdrop-blur-sm p-4">
     <div class="bg-[#1c2228] border border-[#40bcf4]/30 rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative animate-fade-in-fast max-h-[90vh] flex flex-col">
         <button onclick="fecharTutorial()" class="absolute top-4 right-5 text-[#8c9bab] hover:text-white text-3xl font-light z-10">&times;</button>
@@ -256,16 +255,6 @@
                     <li><strong>No App:</strong> Settings > Advanced Settings > Import & Export > Import Your Data > <span class="text-white font-bold">"import to your watchlist"</span>.</li>
                     <li><strong>No Site:</strong> Acesse a Watchlist e clique em <span class="text-white font-bold">Import Watchlist</span>.</li>
                 </ol>
-                
-                <div class="mt-3 border-t border-[#2c3440] pt-3 text-left">
-                    <p class="text-[#8c9bab] text-[9px] sm:text-[10px] mb-2 leading-relaxed opacity-80">
-                        <strong class="text-white font-medium">Dica para celular:</strong> Se o botão tentar abrir o aplicativo e travar, copie este link e cole no navegador:
-                    </p>
-                    <div class="flex items-center gap-2 bg-[#14181c] p-1.5 rounded-lg border border-[#2c3440]">
-                        <input type="text" id="export-link-input" readonly value="https://letterboxd.com/data/export/" class="flex-1 bg-transparent text-[#40bcf4] text-[9px] sm:text-[10px] font-mono outline-none px-1">
-                        <button id="copy-link-btn" onclick="copyExportLink()" class="bg-[#2c3440] hover:bg-[#40bcf4] text-white hover:text-[#14181c] text-[9px] font-bold px-2.5 py-1 rounded transition-colors uppercase tracking-widest shrink-0">Copiar</button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -329,77 +318,101 @@
         </div>
     </header>
 
-    <div id="main-content" class="space-y-6 sm:space-y-10">
-        <div class="text-center space-y-3 sm:space-y-4 pt-4 sm:pt-10">
+    <div id="main-content" class="space-y-8 sm:space-y-12">
+        <div class="text-center space-y-3 sm:space-y-4 pt-4 sm:pt-6">
             <h2 class="text-3xl sm:text-4xl md:text-6xl font-black text-white leading-tight tracking-tighter drop-shadow-lg">QUAL É O SEU PERFIL <br><span class="text-[#40bcf4] italic">CINEMATOGRÁFICO?</span></h2>
-            <p class="text-[#8c9bab] max-w-xl mx-auto text-sm sm:text-base md:text-lg font-medium px-2">Envie o seu arquivo de exportação do Letterboxd (.zip) para iniciarmos a análise dos seus dados.</p>
-            <p class="text-[#8c9bab] text-[8px] sm:text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 mt-3 opacity-50">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                Experiência otimizada para computador
-            </p>
-        </div>
-
-        <div class="glass-panel p-6 md:p-12 text-center border-dashed border-2 border-[#2c3440] hover:border-[#40bcf4]/50 transition-all group mt-6 sm:mt-10">
-            <div class="mb-4 sm:mb-10" id="upload-container">
-                <label for="csv-file" id="dropzone-label" class="cursor-pointer group block">
-                    <div class="w-16 h-16 sm:w-20 sm:h-20 bg-[#40bcf4]/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform border border-[#40bcf4]/20">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 text-[#40bcf4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path></svg>
-                    </div>
-                    <p class="text-lg sm:text-2xl font-bold text-white mb-2">
-                        <span class="hidden sm:inline">Arraste seu arquivo <span class="text-[#40bcf4]">.zip</span> aqui</span>
-                        <span class="sm:hidden">Envie seu arquivo <span class="text-[#40bcf4]">.zip</span></span>
-                    </p>
-                    <p class="text-[10px] sm:text-sm text-[#8c9bab] uppercase tracking-widest font-bold">
-                        <span class="hidden sm:inline">ou clique para procurar no computador</span>
-                        <span class="sm:hidden">ou toque para procurar nos arquivos</span>
-                    </p>
-                </label>
-                <input type="file" id="csv-file" class="hidden" accept=".zip" onchange="fileSelected()">
-                
-                <div id="action-area" class="hidden mt-4 flex-col items-center gap-4">
-                    <div class="flex items-center gap-2 bg-[#14181c] border border-[#2c3440] px-4 py-2 rounded-lg max-w-full">
-                        <svg class="w-4 h-4 text-[#00e054] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        <p id="file-name-display" class="text-[#40bcf4] font-mono text-xs truncate"></p>
-                    </div>
-                    <button id="btn-start-analysis" onclick="handleFileUpload()" class="w-full sm:w-auto bg-gradient-to-r from-[#40bcf4] to-[#2ba8e0] text-[#14181c] font-black py-3 sm:py-4 px-8 rounded-xl uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
-                        <svg id="btn-spinner" class="animate-spin hidden w-5 h-5 text-[#14181c]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span id="btn-text">Iniciar Análise</span>
-                    </button>
-                    <button onclick="resetUpload()" class="text-[10px] text-[#8c9bab] hover:text-white uppercase tracking-widest underline decoration-dashed">Escolher outro arquivo</button>
-                </div>
+            <p class="text-[#8c9bab] max-w-xl mx-auto text-sm sm:text-base md:text-lg font-medium px-2">Descubra a verdade sobre o seu gosto e encontre onde assistir a sua Watchlist.</p>
+            
+            <div class="flex items-center justify-center gap-1.5 opacity-50 pt-1">
+                <svg class="w-3.5 h-3.5 text-[#8c9bab]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <span class="text-[#8c9bab] text-[10px] sm:text-xs uppercase tracking-widest font-medium">Recomendado uso no PC</span>
             </div>
         </div>
 
-        <div class="text-center mt-6 space-y-4">
-            <a href="https://letterboxd.com/data/export/" target="_blank" class="inline-flex items-center justify-center gap-2 bg-[#40bcf4]/10 text-[#40bcf4] border border-[#40bcf4]/30 px-5 py-3.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all w-[95%] sm:w-auto mx-auto shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                Baixar meu .zip do Letterboxd
-            </a>
+        <div class="max-w-2xl mx-auto mt-8 sm:mt-12">
+            <!-- TEXTO DISCRETO INTRODUTÓRIO -->
+            <div class="text-center mb-5">
+                <p class="text-[#8c9bab] text-[10px] sm:text-xs uppercase tracking-widest font-bold opacity-60">
+                    Passo a passo de como conseguir:
+                </p>
+            </div>
             
-            <button onclick="toggleImportTutorial()" class="block w-full text-[10px] text-[#8c9bab] hover:text-white font-bold tracking-widest uppercase transition-colors underline decoration-dashed underline-offset-4 mx-auto pt-2">
-                Ver passo a passo detalhado
-            </button>
-            
-            <div id="import-tutorial" class="hidden mt-4 p-5 bg-[#1c2228]/95 border border-[#2c3440] rounded-xl text-left text-sm text-gray-300 max-w-lg mx-auto shadow-lg">
-                <h4 class="text-white font-black mb-3 uppercase tracking-widest text-xs flex items-center gap-2">
-                    <svg class="w-4 h-4 text-[#40bcf4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                    Passo a passo
-                </h4>
-                
-                <ol class="space-y-2 list-decimal list-inside text-xs text-gray-300 mb-4 px-1">
-                    <li>Acesse o botão azul acima ou clique <a href="https://letterboxd.com/data/export/" target="_blank" class="text-white font-bold underline hover:text-[#40bcf4] transition-colors">aqui</a>.</li>
-                    <li>Faça login apenas se for solicitado (no celular pode abrir no app).</li>
-                    <li>O download do <span class="font-mono text-[#40bcf4]">.zip</span> começa na hora!</li>
-                </ol>
-                
-                <div class="border-t border-[#2c3440] pt-4 text-left">
-                    <p class="text-[#8c9bab] text-[9px] sm:text-[10px] mb-2 leading-relaxed opacity-80">
-                        <strong class="text-white font-medium">Dica para celular:</strong> Se o botão tentar abrir o aplicativo e travar, copie este link e cole no navegador:
-                    </p>
-                    <div class="flex items-center gap-2 bg-[#14181c] p-1.5 rounded-lg border border-[#2c3440]">
-                        <input type="text" id="export-link-input" readonly value="https://letterboxd.com/data/export/" class="flex-1 bg-transparent text-[#40bcf4] text-[9px] sm:text-[10px] font-mono outline-none px-1">
-                        <button id="copy-link-btn" onclick="copyExportLink()" class="bg-[#2c3440] hover:bg-[#40bcf4] text-white hover:text-[#14181c] text-[9px] font-bold px-2.5 py-1 rounded transition-colors uppercase tracking-widest shrink-0">Copiar</button>
+            <div class="space-y-4">
+                <!-- PASSO 1: BAIXAR ZIP -->
+                <div class="flex justify-center">
+                    <!-- Versão Desktop (Botão Largo Minimalista) -->
+                    <a href="https://letterboxd.com/data/export/" target="_blank" class="hidden sm:flex items-center gap-4 bg-[#1c2228] border border-[#2c3440] hover:border-[#40bcf4] text-[#8c9bab] hover:text-white px-6 py-4 rounded-xl transition-all w-full shadow-md group">
+                        <span class="bg-[#40bcf4]/20 text-[#40bcf4] w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 group-hover:bg-[#40bcf4] group-hover:text-[#14181c] transition-colors">1</span>
+                        <span class="font-bold text-sm tracking-wide">Baixar arquivo .ZIP oficial</span>
+                        <svg class="w-5 h-5 text-[#40bcf4] ml-auto opacity-70 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    </a>
+
+                    <!-- Versão Mobile (Aviso Amigável) -->
+                    <div class="sm:hidden w-full bg-[#1c2228] border border-[#2c3440] p-4 rounded-xl shadow-md text-left">
+                        <p class="text-white text-[12px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span class="bg-[#40bcf4]/20 text-[#40bcf4] w-5 h-5 rounded-full flex items-center justify-center text-[9px] shrink-0">1</span>
+                            Baixar arquivo .ZIP
+                        </p>
+                        <p class="text-[#8c9bab] text-[11px] mb-3 leading-relaxed">
+                            Como o aplicativo do Letterboxd às vezes entra num loop na hora do download, <strong class="text-white">copie o link abaixo</strong> e abra direto no seu navegador (Chrome, Safari, etc):
+                        </p>
+                        <div class="flex items-center gap-2 bg-[#14181c] p-1.5 rounded-lg border border-[#40bcf4]/30">
+                            <input type="text" id="export-link-input-main" readonly value="https://letterboxd.com/data/export/" class="flex-1 bg-transparent text-[#40bcf4] text-[10px] font-mono outline-none px-2 w-full min-w-0">
+                            <button id="copy-link-btn-main" onclick="copyMainExportLink()" class="bg-[#40bcf4] text-[#14181c] text-[10px] font-black px-3 py-2 rounded transition-colors uppercase tracking-widest shrink-0">Copiar</button>
+                        </div>
                     </div>
+                </div>
+
+                <!-- PASSO 2: UPLOAD BOX -->
+                <div class="glass-panel p-6 md:p-10 text-center border-dashed border-2 border-[#2c3440] hover:border-[#40bcf4]/50 transition-all group" id="upload-container">
+                    <label for="csv-file" id="dropzone-label" class="cursor-pointer group block">
+                        <div class="flex items-center justify-center gap-2 mb-6">
+                            <p class="text-white font-bold text-sm tracking-wide">Carregar no Oráculo</p>
+                        </div>
+                        
+                        <div class="w-16 h-16 sm:w-20 sm:h-20 bg-[#40bcf4]/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform border border-[#40bcf4]/20">
+                            <svg class="w-8 h-8 sm:w-10 sm:h-10 text-[#40bcf4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path></svg>
+                        </div>
+                        <p class="text-lg sm:text-2xl font-bold text-white mb-2">
+                            <span class="hidden sm:inline">Arraste seu arquivo <span class="text-[#40bcf4]">.zip</span> aqui</span>
+                            <span class="sm:hidden">Selecione o arquivo <span class="text-[#40bcf4]">.zip</span></span>
+                        </p>
+                        <p class="text-[9px] sm:text-[11px] text-[#8c9bab] uppercase tracking-widest font-bold">
+                            Nenhum dado é salvo nos servidores
+                        </p>
+                    </label>
+                    <input type="file" id="csv-file" class="hidden" accept=".zip" onchange="fileSelected()">
+                    
+                    <div id="action-area" class="hidden mt-4 flex-col items-center gap-4 bg-[#14181c] p-6 rounded-xl border border-[#2c3440]">
+                        <div class="flex items-center justify-center gap-2 bg-[#1c2228] border border-[#40bcf4]/30 px-4 py-2.5 rounded-lg w-full">
+                            <svg class="w-4 h-4 text-[#40bcf4] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <p id="file-name-display" class="text-[#40bcf4] font-mono text-xs sm:text-sm truncate"></p>
+                        </div>
+                        <button id="btn-start-analysis" onclick="handleFileUpload()" class="w-full bg-gradient-to-r from-[#40bcf4] to-[#2ba8e0] text-[#14181c] font-black py-3.5 sm:py-4 px-8 rounded-xl uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-xs sm:text-sm">
+                            <svg id="btn-spinner" class="animate-spin hidden w-5 h-5 text-[#14181c]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span id="btn-text">Iniciar Análise</span>
+                        </button>
+                        <button onclick="resetUpload()" class="text-[9px] sm:text-[10px] text-[#8c9bab] hover:text-white uppercase tracking-widest underline decoration-dashed">Escolher outro arquivo</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TUTORIAL MANUAL EXTRA -->
+            <div class="text-center mt-6">
+                <button onclick="toggleImportTutorial()" class="inline-block text-[10px] text-[#8c9bab] hover:text-white font-bold tracking-widest uppercase transition-colors underline decoration-dashed underline-offset-4">
+                    Ver passo a passo manual
+                </button>
+                
+                <div id="import-tutorial" class="hidden mt-4 p-5 bg-[#1c2228]/95 border border-[#2c3440] rounded-xl text-left text-sm text-gray-300 shadow-lg">
+                    <h4 class="text-white font-black mb-3 uppercase tracking-widest text-xs flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#40bcf4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Instruções Manuais
+                    </h4>
+                    <ol class="space-y-2 list-decimal list-inside text-xs text-gray-300 px-1">
+                        <li>Acesse o Letterboxd e vá em <strong class="text-white">Settings > Import & Export</strong>.</li>
+                        <li>Clique no botão <strong class="text-white">Export your data</strong>.</li>
+                        <li>Um arquivo .zip será baixado. <strong class="text-[#00e054]">Não precisa extrair!</strong> Basta enviá-lo aqui no passo 2.</li>
+                    </ol>
                 </div>
             </div>
         </div>
@@ -614,13 +627,19 @@
 
     let currentIconicIdx = Math.floor(Math.random() * iconicMovies.length);
 
-    function copyExportLink() {
-        const input = document.getElementById('export-link-input');
+    function copyMainExportLink() {
+        const input = document.getElementById('export-link-input-main');
         input.select();
         document.execCommand('copy');
-        const btn = document.getElementById('copy-link-btn');
-        btn.innerText = 'Copiado!';
-        setTimeout(() => { btn.innerText = 'Copiar'; }, 2000);
+        const btn = document.getElementById('copy-link-btn-main');
+        btn.innerText = 'Copiado! Cole no Navegador';
+        btn.classList.add('bg-[#00e054]');
+        btn.classList.remove('bg-[#40bcf4]');
+        setTimeout(() => { 
+            btn.innerText = 'Copiar'; 
+            btn.classList.remove('bg-[#00e054]');
+            btn.classList.add('bg-[#40bcf4]');
+        }, 4000);
     }
 
     const updateSlideInfo = (movie) => {
@@ -892,8 +911,6 @@
             });
         }
     }
-
-    async function tentarRegerarPerfil() { if(await verificarCredito()){ await consumirCredito(); gerarPerfilIA(); } }
 
     async function gerarPerfilIA() {
         const tt=document.getElementById('roast-title'), td=document.getElementById('roast-desc'), tv=document.getElementById('roast-vibe'),
