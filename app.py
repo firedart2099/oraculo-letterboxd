@@ -284,7 +284,6 @@ def gerar_perfil():
     is_laura = stats.get('is_laura_birthday', False)
     
     if is_laura:
-        # PROMPT EXCLUSIVO DO ANIVERSÁRIO DA LAURA
         prompt = f"""Atue como um melhor amigo dando um presente mágico de aniversário. A usuária se chama Laura (username: lauraamora) e HOJE É O ANIVERSÁRIO DELA!
         
         DADOS DELA:
@@ -301,18 +300,18 @@ def gerar_perfil():
         
         REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática e a legibilidade do texto. Não invente palavras.
         
-        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER a protagonista do filme favorito dela.
-        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
+        REGRA CRÍTICA 1: O "personagem_referencia" DEVE SER a/o protagonista do "filme_referencia".
+        REGRA CRÍTICA 2: O "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS DE UM DOS FILMES FAVORITOS DELA.
         
-        É OBRIGATÓRIO responder APENAS em JSON estruturado:
+        É OBRIGATÓRIO responder APENAS em JSON estruturado, gerando as suas próprias respostas:
         {{
           "titulo": "✨ Feliz Aniversário, Laura! 🎂",
-          "personagem_referencia": "A Protagonista (Você)",
-          "filme_referencia": "Amelie",
-          "descricao": "Texto gerado aqui..."
+          "personagem_referencia": "[NOME DO PROTAGONISTA AQUI]",
+          "filme_referencia": "[TITULO DO FILME AQUI]",
+          "descricao": "[SEU TEXTO AQUI]"
         }}"""
     else:
-        # PROMPT NORMAL PARA OS OUTROS USUÁRIOS
+        # PROMPT NORMAL PARA OS OUTROS USUÁRIOS COMPLETAMENTE BLINDADO
         prompt = f"""Atue como um crítico de cinema gen-z cronicamente online.
         DADOS PESSOAIS DO USUÁRIO:
         - Username: {stats.get('username', 'Cinéfilo')}
@@ -326,24 +325,20 @@ def gerar_perfil():
 
         Crie um "Perfil Psicológico" na chave "descricao" com EXATAMENTE DOIS PARÁGRAFOS (separe-os usando \\n\\n):
         
-        PARÁGRAFO 1 (O Deboche Cronicamente Online): Fale DIRETAMENTE com o usuário (use sempre a palavra "você"). Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que a pessoa escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas que ela tem.
-        PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda. Continue falando diretamente com o usuário ("você"). Elogie a forma como o usuário usa o cinema como catarse, buscando beleza e significado. 
+        PARÁGRAFO 1 (O Deboche Cronicamente Online): Fale DIRETAMENTE com o usuário (use sempre a palavra "você"). Faça um "roast" sarcástico e letal. Aponte o contraste absurdo entre o que a pessoa escreveu na Bio ou os favoritos que escolheu para "parecer cult" versus as outras notas que ela tem. Se a pessoa tiver visto poucos filmes ou só filmes esquisitos, zombe disso impiedosamente.
+        PARÁGRAFO 2 (A Análise Romântica e Sensível): Mude completamente o TOM DAS PALAVRAS. Sem usar ironia nas palavras, faça uma análise poética, madura e profunda baseada nos filmes que ela viu. Continue falando diretamente com o usuário ("você"). Elogie a forma como o usuário usa o cinema como catarse. 
         
         REGRA DE GÊNERO: NUNCA assuma o gênero do usuário baseado no nome. Trate o usuário de forma neutra ou diretamente por "você". É ESTRITAMENTE PROIBIDO usar palavras como "rainha", "rei", "ela" ou "ele" para se referir ao usuário.
         
-        REGRA DE GRAMÁTICA E COESÃO: Cheque rigorosamente a gramática, a coesão e a legibilidade do texto. Mantenha um português impecável. NUNCA invente palavras ou gírias que não existem.
+        REGRA DE COERÊNCIA (MUITO IMPORTANTE): O "personagem_referencia" DEVE OBRIGATORIAMENTE pertencer ao "filme_referencia". Não coloque o nome de um personagem de uma série com o nome de outro filme. Eles devem ser um "match" perfeito (exemplo: se o filme for "Cars", o personagem pode ser "Lightning McQueen").
+        O "filme_referencia" deve ser um título original em INGLÊS que represente perfeitamente o gosto BIZARRO ou CULT do usuário.
         
-        REGRA DE EMOJIS: Em AMBOS OS PARÁGRAFOS tempere o texto usando EXCLUSIVAMENTE ALGUNS destes emojis específicos: 🙄🤤😔😓😞😭😢🥺💀☠️👍🤌💅🫦💋🔥😻😿🥺😼🤓🙈. A graça é falar coisas lindíssimas no segundo parágrafo, mas continuar a pontuar com emojis de deboche (ex: "...sua busca genuína por beleza 😭💅").
-
-        REGRA CRÍTICA 1: "personagem_referencia" DEVE SER um personagem fictício real.
-        REGRA CRÍTICA 2: "filme_referencia" DEVE SER O TÍTULO ORIGINAL EM INGLÊS.
-
-        É OBRIGATÓRIO responder APENAS em JSON estruturado:
+        É OBRIGATÓRIO responder APENAS em JSON estruturado. VOCÊ DEVE CRIAR SEUS PRÓPRIOS VALORES, NÃO COPIE ESTE EXEMPLO:
         {{
-          "titulo": "A Farsa do Cinema Cult 💅",
-          "personagem_referencia": "Kendall Roy",
-          "filme_referencia": "Drive",
-          "descricao": "Texto gerado aqui..."
+          "titulo": "[CRIE UM TITULO SARCASTICO AQUI]",
+          "personagem_referencia": "[CRIE UM PERSONAGEM AQUI]",
+          "filme_referencia": "[COLOQUE O FILME DESSE PERSONAGEM AQUI]",
+          "descricao": "[CRIE SEUS DOIS PARAGRAFOS AQUI]"
         }}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -351,7 +346,7 @@ def gerar_perfil():
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7, 
+        "temperature": 0.8, 
         "response_format": {"type": "json_object"} 
     }
 
@@ -389,8 +384,8 @@ def oraculo():
         odiados = sessao.get('odiados', [])
         vistos_globais = sessao.get('vistos', [])
         
-        amados_amostra = random.sample(amados, min(8, len(amados))) if amados else ["Bons filmes"]
-        odiados_amostra = random.sample(odiados, min(4, len(odiados))) if odiados else ["Filmes maus"]
+        amados_amostra = random.sample(amados, min(8, len(amados))) if amados else ["Filmes aleatórios"]
+        odiados_amostra = random.sample(odiados, min(4, len(odiados))) if odiados else ["Nenhum"]
 
         top_4_favorites = request.json.get('favorites', []) if request.is_json else []
         filmes_ja_recomendados = request.json.get('exclude', []) if request.is_json else []
@@ -399,43 +394,34 @@ def oraculo():
         texto_exclusao = f"REGRA CRÍTICA (IGNORAR ESTES): É PROIBIDO recomendar os seguintes filmes, pois você JÁ os recomendou nesta sessão: {', '.join(filmes_ja_recomendados)}" if filmes_ja_recomendados else ""
 
         if GROQ_API_KEY:
-            temas_aleatorios = [
-                "Favoritos do público e da crítica (nota 3.8+ no Letterboxd).",
-                "Grandes filmes de estúdios aclamados como A24, Neon, ou clássicos modernos.",
-                "Thrillers famosos, suspenses e filmes que prendem do início ao fim.",
-                "Comédias, romances ou dramas muito bem avaliados e populares.",
-                "Filmes com elencos estelares e diretores renomados que o usuário pode ter deixado passar.",
-                "Obras que foram um sucesso cultural e pop nos últimos 20 anos."
-            ]
-            tema_escolhido = random.choice(temas_aleatorios)
-
-            prompt = f"""Atue como um curador de cinema profissional, focado em entender a vibe exata do usuário. 
+            # O Oráculo agora força a vibe do usuário, não importa quão bizarra seja.
+            prompt = f"""Atue como um curador de cinema profissional, focado em entender a vibe EXATA e ESPECÍFICA do usuário. 
             
             DADOS DE GOSTO DO USUÁRIO:
             {top_4_texto}
             - Outros filmes que amou (nota máxima): {amados_amostra}
             - Filmes que odiou (nota baixa): {odiados_amostra}
 
-            Recomende EXATAMENTE 15 filmes MUITO BONS (Nota média > 3.6) que o usuário provavelmente ainda não viu, MAS QUE COMBINEM COM O GOSTO DELE.
+            Sua missão é recomendar EXATAMENTE 15 filmes que o usuário provavelmente ainda não viu, MAS QUE SEJAM DO MESMO ESTILO DO QUE ELE ASSISTE.
             
-            DIRETRIZ DE CURADORIA MESTRE: Analise os TOP 4 FAVORITOS do usuário. Extraia a essência, os gêneros (ex: comédia, terror, romance, ficção) e a atmosfera deles e use isso como base principal. Cruze essa essência com: {tema_escolhido}
+            REGRA CRÍTICA 1 - PERSONALIZAÇÃO EXTREMA E ABSOLUTA: O perfil do usuário dita 100% as regras. 
+            - Se o usuário só tem filmes de animação infantil de carros (ex: The Little Cars), VOCÊ DEVE recomendar animações infantis, filmes de carros, Disney, Pixar, ou filmes família. NÃO RECOMENDE DRAMAS CULT SE ELE SÓ VÊ ANIMAÇÃO.
+            - Se o usuário gosta de terror, recomende terror. Se gosta de romance adolescente, recomende romance adolescente. Adapte-se totalmente à "vibe" da lista dele.
             
-            REGRA CRÍTICA 1 - PERSONALIZAÇÃO EXTREMA: O perfil do usuário dita as regras. Não empurre filmes obscuros iranianos se ele gosta de comédia romântica ou ação. 
-            
-            REGRA CRÍTICA 2 - FILMES FAMOSOS LIBERADOS: VOCÊ DEVE recomendar filmes populares, aclamados e "famosinhos" do Letterboxd. Pode recomendar grandes sucessos de Hollywood, filmes cult muito conhecidos, sucessos recentes ou clássicos muito amados. Apenas EVITE mega-franquias óbvias (Marvel, DC, Star Wars, Harry Potter, Velozes e Furiosos).
+            REGRA CRÍTICA 2 - EVITAR MEGA-FRANQUIAS: Evite as escolhas mais óbvias do mundo (Marvel, Star Wars), mas pode recomendar sucessos de bilheteria e filmes populares que se encaixem no gosto dele.
             
             {texto_exclusao}
 
             REGRAS DE FORMATO (OBRIGATÓRIO):
             1. "rec_original": Título original do filme em INGLÊS.
             2. "rec": MESMO TÍTULO EM INGLÊS.
-            3. "base": Uma definição de gênero curta (ex: "Thriller Psicológico", "Comédia Romântica"). (Máximo 4 palavras).
+            3. "base": Uma definição de gênero curta. (Máximo 4 palavras).
             4. "desc": Uma sinopse chamativa e bem escrita que venda o filme, PT-BR. (Aproximadamente 15 a 25 palavras).
 
-            É OBRIGATÓRIO responder APENAS em JSON estruturado:
+            É OBRIGATÓRIO responder APENAS em JSON estruturado. GERE SEUS PRÓPRIOS VALORES PARA A LISTA:
             {{
               "recomendacoes": [
-                {{"rec_original": "Gone Girl", "rec": "Gone Girl", "ano": 2014, "base": "Suspense Psicológico Intenso", "desc": "Um homem vê sua vida desmoronar e se torna o principal suspeito quando sua esposa desaparece misteriosamente no dia do aniversário de casamento."}}
+                {{"rec_original": "[TITULO_ORIGINAL]", "rec": "[TITULO_EM_INGLES]", "ano": 2000, "base": "[GENERO]", "desc": "[SINOPSE]"}}
               ]
             }}"""
             
