@@ -195,6 +195,12 @@
 </head>
 <body class="p-2 sm:p-4 md:p-8 min-h-screen relative">
 
+<!-- Sistema de Notificações Toast -->
+<div id="custom-toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-[#1c2228]/95 backdrop-blur-md border border-[#ff8000]/50 text-[#ff8000] px-5 py-3.5 rounded-2xl shadow-[0_10px_30px_rgba(255,128,0,0.15)] z-[100000] flex items-center gap-3 transition-all duration-500 opacity-0 pointer-events-none translate-y-10 max-w-[90vw]">
+    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+    <p id="custom-toast-msg" class="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-center">Erro.</p>
+</div>
+
 <div id="ps-trophy" class="ps-trophy">
     <div class="trophy-icon">🏆</div>
     <div>
@@ -216,7 +222,7 @@
     <div id="countdown-text" class="countdown-number">3</div>
 </div>
 
-<!-- Modal de Tutorial Reduzido (apenas para exportar de volta ao Letterboxd) -->
+<!-- Modal de Tutorial Reduzido -->
 <div id="tutorial-modal" class="fixed inset-0 bg-[#14181c]/90 z-[10000] hidden items-center justify-center backdrop-blur-sm p-4">
     <div class="bg-[#1c2228] border border-[#40bcf4]/30 rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative animate-fade-in-fast max-h-[90vh] flex flex-col">
         <button onclick="fecharTutorial()" class="absolute top-4 right-5 text-[#8c9bab] hover:text-white text-3xl font-light z-10">&times;</button>
@@ -324,7 +330,7 @@
             <p class="text-[#8c9bab] max-w-xl mx-auto text-sm sm:text-base md:text-lg font-medium px-2">Descubra a verdade sobre o seu gosto e encontre onde assistir a sua Watchlist.</p>
             
             <div class="flex items-center justify-center gap-1.5 opacity-50 pt-1">
-                <svg class="w-3.5 h-3.5 text-[#8c9bab]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <svg class="w-3.5 h-3.5 text-[#8c9bab]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2-2v10a2 2 0 002 2z"></path></svg>
                 <span class="text-[#8c9bab] text-[10px] sm:text-xs uppercase tracking-widest font-medium">Recomendado uso no PC</span>
             </div>
         </div>
@@ -340,14 +346,14 @@
             <div class="space-y-4">
                 <!-- PASSO 1: BAIXAR ZIP -->
                 <div class="flex justify-center">
-                    <!-- Versão Desktop (Botão Largo Minimalista) -->
+                    <!-- Versão Desktop -->
                     <a href="https://letterboxd.com/data/export/" target="_blank" class="hidden sm:flex items-center gap-4 bg-[#1c2228] border border-[#2c3440] hover:border-[#40bcf4] text-[#8c9bab] hover:text-white px-6 py-4 rounded-xl transition-all w-full shadow-md group">
                         <span class="bg-[#40bcf4]/20 text-[#40bcf4] w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 group-hover:bg-[#40bcf4] group-hover:text-[#14181c] transition-colors">1</span>
                         <span class="font-bold text-sm tracking-wide">Baixar arquivo .ZIP oficial</span>
                         <svg class="w-5 h-5 text-[#40bcf4] ml-auto opacity-70 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     </a>
 
-                    <!-- Versão Mobile (Aviso Amigável) -->
+                    <!-- Versão Mobile -->
                     <div class="sm:hidden w-full bg-[#1c2228] border border-[#2c3440] p-4 rounded-xl shadow-md text-left">
                         <p class="text-white text-[12px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
                             <span class="bg-[#40bcf4]/20 text-[#40bcf4] w-5 h-5 rounded-full flex items-center justify-center text-[9px] shrink-0">1</span>
@@ -627,6 +633,16 @@
 
     let currentIconicIdx = Math.floor(Math.random() * iconicMovies.length);
 
+    function mostrarErro(mensagem) {
+        const toast = document.getElementById('custom-toast');
+        const msgEl = document.getElementById('custom-toast-msg');
+        msgEl.innerText = mensagem;
+        toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-10');
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-10');
+        }, 4000);
+    }
+
     function copyMainExportLink() {
         const input = document.getElementById('export-link-input-main');
         input.select();
@@ -829,7 +845,7 @@
                 exibirRaioX(); carregarOraculo(); iniciarFluxoWatchlist();
             });
         } catch(e) { 
-            alert("Erro ao ler arquivo .zip. Tente novamente."); 
+            mostrarErro("Erro ao ler arquivo .zip. Tente novamente."); 
             btn.disabled = false;
             btnSpinner.classList.add('hidden');
             btnText.innerText = "Iniciar Análise";
@@ -941,16 +957,26 @@
 
     async function carregarOraculo() {
         const f = await buscarAteQuatroIneditos();
+        const grid = document.getElementById('oracle-grid');
+        grid.innerHTML = ''; 
         if(f.length > 0) {
             oraculoRecomendacoesGlobais = f; f.forEach((_,i)=>filmesSelecionados.add(i));
-            document.getElementById('oracle-grid').innerHTML = ''; renderizarOraculoCards(f, 0);
+            renderizarOraculoCards(f, 0);
+        } else {
+            grid.innerHTML = `
+                <div class="col-span-full text-center p-6 bg-[#ff8000]/10 border border-[#ff8000]/30 rounded-xl mx-2">
+                    <p class="text-[#ff8000] text-xs font-bold leading-relaxed">
+                        A API da Groq atingiu o limite de acessos por minuto 💀.<br>Aguarde 60 segundos e tente recarregar a página!
+                    </p>
+                </div>
+            `;
         }
     }
 
     async function buscarAteQuatroIneditos() {
         let f = [], t = 0;
-        while(f.length < 4 && t < 4) {
-            if(t===1) {
+        while(f.length < 4 && t < 4) { // Limite reduzido para 4 para não dar spam no Rate Limit
+            if(t >= 1) { 
                 const trophy = document.getElementById('ps-trophy');
                 if (trophy && !trophy.classList.contains('show')) {
                     trophy.classList.add('show');
@@ -963,7 +989,13 @@
                 const res = await fetch(`/oraculo?session_id=${sessionId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody });
                 const r = await res.json();
                 
-                if(r.recomendacoes) {
+                // Puxa o freio de mão se o servidor mandar o código de Rate Limit
+                if (r.erro === "RATE_LIMIT") {
+                    mostrarErro("Limite de velocidade da API atingido. Aguarde 1 minuto!");
+                    break; 
+                }
+
+                if(r.recomendacoes && r.recomendacoes.length > 0) {
                     r.recomendacoes.forEach(x => {
                         const tituloLimpo = x.rec.toLowerCase().trim();
                         const jaExisteGlob = oraculoRecomendacoesGlobais.some(y => y.rec.toLowerCase().trim() === tituloLimpo);
@@ -971,7 +1003,15 @@
                         if(!jaExisteGlob && !jaExisteLocal && f.length < 4) { f.push(x); }
                     });
                 }
-            } catch(e) { break; }
+                
+                // Se a IA ainda não deu os 4 filmes perfeitos e não estamos bloqueados, espera 2.5s antes de pedir de novo
+                if (f.length < 4 && r.erro !== "RATE_LIMIT") {
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                }
+            } catch(e) { 
+                console.error("Erro na tentativa de recomendação da IA:", e); 
+                await new Promise(resolve => setTimeout(resolve, 2500));
+            }
             t++;
         }
         return f.slice(0,4); 
@@ -981,11 +1021,16 @@
         if(!(await verificarCredito())) return; await consumirCredito();
         document.getElementById('load-more-spinner').classList.remove('hidden');
         document.getElementById('load-more-icon').classList.add('hidden');
+        
         const nov = await buscarAteQuatroIneditos();
-        if(nov.length>0) {
+        
+        if(nov.length > 0) {
             const s = oraculoRecomendacoesGlobais.length; oraculoRecomendacoesGlobais.push(...nov);
             nov.forEach((_,i)=>filmesSelecionados.add(s+i)); renderizarOraculoCards(nov, s);
+        } else {
+            mostrarErro("A IA precisa de uma pausa de 1 minuto por limites de acesso!");
         }
+        
         document.getElementById('load-more-spinner').classList.add('hidden');
         document.getElementById('load-more-icon').classList.remove('hidden');
     }
