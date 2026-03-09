@@ -415,18 +415,22 @@ def oraculo():
         tentativas_ia = 0
         is_real_terror = False
 
-        while len(recs_finais) < 4 and tentativas_ia < 4:
+        # Reduzimos o máximo de tentativas para 3, para evitar que a IA estoure os tokens por minuto
+        while len(recs_finais) < 4 and tentativas_ia < 3:
             favoritos = request.json.get('favorites', [])
-            blacklist_amostra = random.sample(list(blacklist_total), min(150, len(blacklist_total)))
+            
+            # Reduzimos a amostra enviada no prompt para poupar Tokens de Entrada
+            blacklist_amostra = random.sample(list(blacklist_total), min(100, len(blacklist_total)))
 
             prompt = f"""Atue como curador profissional. Favoritos do usuário: {favoritos}.
-            Recomende 25 filmes de estilo similar mas que sejam ABSOLUTAMENTE INÉDITOS para ele.
+            Recomende EXATAMENTE 10 filmes de estilo similar mas que sejam ABSOLUTAMENTE INÉDITOS para ele.
             
             ESQUEÇA ESTES FILMES (O usuário já viu ou conhece):
             {', '.join(blacklist_amostra)}
-            {', '.join(list(excl_sessao)[:50])}
+            {', '.join(list(excl_sessao)[:30])}
             
             DICA: Se ele gosta de coisas populares, procure o 'lado B'. Se gosta de cult, procure o 'underground'.
+            NÃO USE asteriscos (*) nos nomes.
             {{ "recomendacoes": [ {{"rec_original": "TITLE", "rec": "TITLE", "ano": 2000, "base": "GENERO", "desc": "DESC"}} ] }}"""
 
             dados_json = gerar_resposta_ia(prompt)
@@ -439,14 +443,15 @@ def oraculo():
                 if nome not in blacklist_total and orig not in blacklist_total:
                     if nome not in [rf['rec'].lower() for rf in recs_finais]:
                         recs_finais.append(r)
-                        if len(recs_finais) >= 15: break 
+                        if len(recs_finais) >= 8: break 
             
             tentativas_ia += 1
-            if tentativas_ia >= 3 and len(recs_finais) < 4:
+            if tentativas_ia >= 2 and len(recs_finais) < 4:
                 is_real_terror = True
             
             if len(recs_finais) < 4: 
-                time.sleep(1.5)
+                # Pausa um pouco maior para a IA "respirar" e não ativar o Rate Limit de RPM
+                time.sleep(2.0)
 
         res_payload = {"recomendacoes": recs_finais}
         if is_real_terror:
