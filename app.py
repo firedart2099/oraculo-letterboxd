@@ -137,7 +137,7 @@ def gerar_resposta_ia(prompt):
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
                         "responseMimeType": "application/json",
-                        "maxOutputTokens": 800 # Limite aumentado para textos maiores, mas seguro contra loops
+                        "maxOutputTokens": 600 # Ajustado para o tamanho ideal médio
                     },
                     "safetySettings": [
                         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
@@ -166,7 +166,7 @@ def gerar_resposta_ia(prompt):
                     "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.85,
-                    "max_tokens": 800, # Limite físico na Groq aumentado para caber o textão
+                    "max_tokens": 600, # Ajustado para o tamanho ideal médio
                     "response_format": {"type": "json_object"} 
                 }
                 # Timeout REDUZIDO para 12s para evitar SIGKILL no Render
@@ -185,7 +185,6 @@ def gerar_resposta_ia(prompt):
 
 # ==========================================
 # FUNÇÕES DE ESTADO (BANCO DE DADOS)
-# Uso de `closing` para evitar o temido Memory Leak no Render
 # ==========================================
 def set_progresso(session_id, atual, total, finalizado, filme_atual):
     with db_lock:
@@ -402,7 +401,7 @@ def gerar_perfil():
     Média: {stats.get('media_notas')}
     
     REGRAS DA MISSÃO:
-    1. Escreva um Roast letal em EXATAMENTE 2 PARÁGRAFOS GRANDES, DENSOS E DETALHADOS. Mergulhe fundo na mediocridade do gosto da pessoa, seja dramático e tagarela. Sem economia de palavras!
+    1. Escreva um Roast letal em EXATAMENTE 2 PARÁGRAFOS DE TAMANHO MÉDIO (cerca de 5 a 7 linhas cada). Seja incisivo e direto. Não escreva uma redação gigante!
     2. "personagem_referencia" DEVE SER O NOME DE UM PERSONAGEM FAMOSO DE FILME (ex: Neo, Batman, Velma). É estritamente PROIBIDO usar o nome "{username}" como personagem.
     3. Use exclusivamente estes emojis: 🙈🤓😼🥺😿😻💋🫦🔥💅👍☠️💀😢😭😞😓😔🤤🙄.
     4. ZERO asteriscos (*) ou formatação Markdown.
@@ -412,7 +411,7 @@ def gerar_perfil():
         "titulo": "TÍTULO DEBOCHADO", 
         "personagem_referencia": "NOME DO PERSONAGEM FICTÍCIO (NUNCA O USERNAME)", 
         "filme_referencia": "NOME DO FILME", 
-        "descricao": "PARÁGRAFO 1 LONGO E ÁCIDO\\n\\nPARÁGRAFO 2 LONGO E ÁCIDO" 
+        "descricao": "PARÁGRAFO 1 MÉDIO\\n\\nPARÁGRAFO 2 MÉDIO" 
     }}"""
     
     try: 
