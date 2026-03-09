@@ -389,12 +389,26 @@ def upload_profile():
 @app.route('/gerar_perfil', methods=['POST'])
 def gerar_perfil():
     stats = request.json.get('stats', {})
+    username = stats.get('username', 'Usuário')
+    
+    # Prompt blindado para obrigar 2 parágrafos e proibir o uso do Username como personagem
     prompt = f"""Atue como um crítico de cinema do Letterboxd insuportável, esnobe e cronicamente online.
-    Username: {stats.get('username')}, Bio: "{stats.get('bio')}", Favoritos: {', '.join(stats.get('profile_favorites', []))}, Média: {stats.get('media_notas')}.
-    MISSÃO: Escreva um Roast letal em 2 PARÁGRAFOS curtos. Use apenas: 🙈🤓😼🥺😿😻💋🫦🔥💅👍☠️💀😢😭😞😓😔🤤🙄.
-    NÃO USE asteriscos (*) ou qualquer formatação Markdown nos nomes dos filmes ou no texto.
+    Username: {username}, Bio: "{stats.get('bio')}", Favoritos: {', '.join(stats.get('profile_favorites', []))}, Média: {stats.get('media_notas')}.
+    
+    REGRAS DA MISSÃO:
+    1. Escreva um Roast letal em EXATAMENTE 2 PARÁGRAFOS (use obrigatoriamente \\n\\n para separar os parágrafos).
+    2. "personagem_referencia" tem que ser um PERSONAGEM FICTÍCIO do "filme_referencia". NUNCA use "{username}" como personagem!
+    3. Use exclusivamente estes emojis: 🙈🤓😼🥺😿😻💋🫦🔥💅👍☠️💀😢😭😞😓😔🤤🙄.
+    4. ZERO asteriscos (*) ou formatação Markdown.
+    
     Responda OBRIGATORIAMENTE em formato json:
-    {{ "titulo": "TÍTULO", "personagem_referencia": "NOME", "filme_referencia": "FILME", "descricao": "ROAST" }}"""
+    {{ 
+        "titulo": "TÍTULO DEBOCHADO", 
+        "personagem_referencia": "NOME DE UM PERSONAGEM (PROIBIDO USAR O USERNAME)", 
+        "filme_referencia": "NOME DO FILME", 
+        "descricao": "PARÁGRAFO 1\\n\\nPARÁGRAFO 2" 
+    }}"""
+    
     try: 
         dados = gerar_resposta_ia(prompt)
         
