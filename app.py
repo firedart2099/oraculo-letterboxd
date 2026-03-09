@@ -21,9 +21,11 @@ load_dotenv()
 app = Flask(__name__)
 ARQUIVO_FRASES = "frases.txt" 
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+# Limpeza agressiva das chaves para evitar erros de aspas invisíveis no Render
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").replace('"', '').replace("'", "").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").replace('"', '').replace("'", "").strip()
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "").replace('"', '').replace("'", "").strip()
+
 DB_NAME = "oraculo.db"
 
 db_lock = threading.Lock()
@@ -91,40 +93,69 @@ def handle_exception(e):
 def limpar_e_parsear_json(content):
     content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE|re.IGNORECASE)
     content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE).strip()
+    
+    dados = None
     match = re.search(r'\{.*\}', content, re.DOTALL)
+    
     if match:
         try:
             dados = json.loads(match.group(0))
-            if "descricao" in dados:
-                txt = dados["descricao"].strip()
-                if txt.startswith('"') and txt.endswith('"'):
-                    txt = txt[1:-1]
-                dados["descricao"] = txt.strip()
-            return dados
         except Exception as e: 
             print(f"Erro ao fazer parse do regex JSON: {e}")
-    try:
-        return json.loads(content)
-    except Exception as e:
-        print(f"Erro no fallback do parse JSON: {e}")
-        return {}
+            
+    if not dados:
+        try:
+            dados = json.loads(content)
+        except Exception as e:
+            print(f"Erro no fallback do parse JSON: {e}")
+            return {}
+
+    # Limpeza agressiva de aspas extras e asteriscos gerados pela IA nos textos
+    if isinstance(dados, dict):
+        for key, value in dados.items():
+            if isinstance(value, str):
+                dados[key] = value.replace('"', '').replace('*', '').strip()
+        
+        # Limpa aspas e asteriscos também nas recomendações do Oráculo, se existirem
+        if "recomendacoes" in dados and isinstance(dados["recomendacoes"], list):
+            for rec in dados["recomendacoes"]:
+                for k, v in rec.items():
+                    if isinstance(v, str):
+                        rec[k] = v.replace('"', '').replace('*', '').strip()
+                        
+    return dados
 
 def gerar_resposta_ia(prompt):
     with ia_lock: 
+        # Tenta Gemini primeiro (Modelo Flash 2.5 estável)
         if GEMINI_API_KEY:
             try:
                 url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+                
+                # Desligando os filtros de segurança do Google para permitir o 'Roast' letal
                 payload_gemini = {
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"responseMimeType": "application/json"}
+                    "generationConfig": {"responseMimeType": "application/json"},
+                    "safetySettings": [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                    ]
                 }
-                res_gemini = requests.post(url_gemini, json=payload_gemini, timeout=45) 
+                # Timeout ajustado para não travar o Render
+                res_gemini = requests.post(url_gemini, json=payload_gemini, timeout=25) 
+                
                 if res_gemini.status_code == 200:
                     content = res_gemini.json()['candidates'][0]['content']['parts'][0]['text']
                     return limpar_e_parsear_json(content)
+                else:
+                    # Imprime o erro exato do Google no painel do Render
+                    print(f"⚠️ Gemini falhou (Status {res_gemini.status_code}): {res_gemini.text[:300]}")
             except Exception as e: 
-                print(f"Erro na tentativa com Gemini: {e}")
+                print(f"Erro de conexão com Gemini: {e}")
 
+        # Tenta Groq como Plano B
         if GROQ_API_KEY:
             try:
                 url_groq = "https://api.groq.com/openai/v1/chat/completions"
@@ -135,13 +166,17 @@ def gerar_resposta_ia(prompt):
                     "temperature": 0.85, 
                     "response_format": {"type": "json_object"} 
                 }
-                res_groq = requests.post(url_groq, headers=headers_groq, json=payload_groq, timeout=25)
+                res_groq = requests.post(url_groq, headers=headers_groq, json=payload_groq, timeout=15)
+                
                 if res_groq.status_code == 200:
                     content = res_groq.json()['choices'][0]['message']['content']
                     return limpar_e_parsear_json(content)
+                else:
+                    print(f"⚠️ Groq falhou (Status {res_groq.status_code}): {res_groq.text[:300]}")
             except Exception as e: 
-                print(f"Erro na tentativa com Groq: {e}")
+                print(f"Erro de conexão com Groq: {e}")
         
+        # Se chegou aqui, TODAS as IAs falharam. Repassa a exceção.
         raise Exception("RATE_LIMIT")
 
 # ==========================================
@@ -154,7 +189,7 @@ def set_progresso(session_id, atual, total, finalizado, filme_atual):
                 conn.execute('''INSERT OR REPLACE INTO progress (session_id, atual, total, finalizado, filme_atual)
                                 VALUES (?, ?, ?, ?, ?)''', (session_id, atual, total, int(finalizado), filme_atual))
         except Exception as e: 
-            print(f"Erro ao atualizar progresso DB: {e}")
+            pass
 
 def get_progresso(session_id):
     try:
@@ -163,7 +198,7 @@ def get_progresso(session_id):
             if row:
                 return {"atual": row['atual'], "total": row['total'], "finalizado": bool(row['finalizado']), "filme_atual": row['filme_atual']}
     except Exception as e: 
-        print(f"Erro ao ler progresso DB: {e}")
+        pass
     return {"atual": 0, "total": 0, "finalizado": False, "filme_atual": "Aguardando..."}
 
 def salvar_sessao(session_id, vistos, amados, odiados, watchlist):
@@ -174,7 +209,7 @@ def salvar_sessao(session_id, vistos, amados, odiados, watchlist):
                                 VALUES (?, ?, ?, ?, ?)''', 
                                 (session_id, json.dumps(vistos), json.dumps(amados), json.dumps(odiados), json.dumps(watchlist)))
         except Exception as e: 
-            print(f"Erro ao salvar sessao DB: {e}")
+            pass
 
 def carregar_sessao(session_id):
     try:
@@ -188,7 +223,7 @@ def carregar_sessao(session_id):
                     'watchlist': json.loads(row['watchlist'])
                 }
     except Exception as e: 
-        print(f"Erro ao carregar sessao DB: {e}")
+        pass
     return None
 
 def get_cache_streamings(chave):
@@ -198,7 +233,7 @@ def get_cache_streamings(chave):
             if row:
                 return json.loads(row['streamings'])
     except Exception as e: 
-        print(f"Erro ao buscar cache DB: {e}")
+        pass
     return None
 
 def set_cache_streamings(chave, streamings):
@@ -207,7 +242,7 @@ def set_cache_streamings(chave, streamings):
             with get_db() as conn:
                 conn.execute('INSERT OR REPLACE INTO global_cache (chave, streamings) VALUES (?, ?)', (chave, json.dumps(streamings)))
         except Exception as e: 
-            print(f"Erro ao salvar cache DB: {e}")
+            pass
 
 def salvar_dados_finais(session_id, dados):
     with db_lock:
@@ -215,7 +250,7 @@ def salvar_dados_finais(session_id, dados):
             with get_db() as conn:
                 conn.execute('INSERT OR REPLACE INTO dados_finais (session_id, dados) VALUES (?, ?)', (session_id, json.dumps(dados)))
         except Exception as e: 
-            print(f"Erro ao salvar dados finais DB: {e}")
+            pass
 
 def get_dados_finais(session_id):
     try:
@@ -224,7 +259,7 @@ def get_dados_finais(session_id):
             if row:
                 return json.loads(row['dados'])
     except Exception as e: 
-        print(f"Erro ao ler dados finais DB: {e}")
+        pass
     return {"stats": {}, "watchlist": {}}
 
 def resolve_boxd_links(links_str):
@@ -241,7 +276,7 @@ def resolve_boxd_links(links_str):
                 slug = re.sub(r'-\d{4}$', '', slug)
                 filmes.append(slug.replace('-', ' ').title())
         except Exception as e: 
-            print(f"Erro ao resolver link Boxd ({url}): {e}")
+            pass
     return filmes
 
 # ==========================================
@@ -273,7 +308,6 @@ def tmdb_search():
         res = requests.get(url, timeout=10)
         return jsonify(res.json()) if res.status_code == 200 else jsonify({"results": []})
     except Exception as e: 
-        print(f"Erro API TMDB Search: {e}")
         return jsonify({"results": []}), 200
 
 @app.route('/')
@@ -286,14 +320,12 @@ def get_frases():
         with open(ARQUIVO_FRASES, 'r', encoding='utf-8') as f:
             return jsonify([linha.strip() for linha in f.readlines() if linha.strip()])
     except Exception as e: 
-        print(f"Erro ao carregar frases: {e}")
         return jsonify(["Analisando a sua curadoria..."])
 
 @app.route('/progress', methods=['GET'])
 def route_get_progress(): 
     return jsonify(get_progresso(request.args.get('session_id', 'default')))
 
-# --- ROTA DE DADOS ATUALIZADA SEGUNDO A RECOMENDAÇÃO ---
 @app.route('/dados', methods=['GET'])
 def get_dados():
     sid = request.args.get('session_id', 'default')
@@ -355,11 +387,16 @@ def gerar_perfil():
     prompt = f"""Atue como um crítico de cinema do Letterboxd insuportável, esnobe e cronicamente online.
     Username: {stats.get('username')}, Bio: "{stats.get('bio')}", Favoritos: {', '.join(stats.get('profile_favorites', []))}, Média: {stats.get('media_notas')}.
     MISSÃO: Escreva um Roast letal em 2 PARÁGRAFOS curtos. Use apenas: 🙈🤓😼🥺😿😻💋🫦🔥💅👍☠️💀😢😭😞😓😔🤤🙄.
+    NÃO USE asteriscos (*) ou qualquer formatação Markdown nos nomes dos filmes ou no texto.
     {{ "titulo": "TÍTULO", "personagem_referencia": "NOME", "filme_referencia": "FILME", "descricao": "ROAST" }}"""
     try: 
         return jsonify(gerar_resposta_ia(prompt))
     except Exception as e: 
         print(f"Erro ao gerar perfil IA: {e}")
+        # Retorna erro explícito para o front-end não travar
+        if "RATE_LIMIT" in str(e):
+            return jsonify({"erro": "RATE_LIMIT"})
+            
         return jsonify({"titulo": "Algoritmo em Choque 💀", "personagem_referencia": "Bateman", "filme_referencia": "American Psycho", "descricao": "Gosto caótico demais. 🙄💅"})
 
 @app.route('/oraculo', methods=['GET', 'POST'])
@@ -421,6 +458,9 @@ def oraculo():
         return jsonify(res_payload)
     except Exception as e:
         print(f"Erro Oráculo: {e}")
+        # DEVOLVE O ERRO CORRETO PARA O FRONTEND NÃO FICAR EM LOOP E NÃO ACIONAR O TERROR FALSO
+        if "RATE_LIMIT" in str(e):
+            return jsonify({"erro": "RATE_LIMIT", "recomendacoes": []})
         return jsonify({"erro": "Falha", "recomendacoes": []})
 
 def processar_em_segundo_plano(watchlist_data, sid):
@@ -460,7 +500,7 @@ def processar_em_segundo_plano(watchlist_data, sid):
                                     if p['provider_name'] not in streamings: 
                                         streamings.append(p['provider_name'])
         except Exception as e: 
-            print(f"Erro ao consultar TMDB para o filme '{filme}': {e}")
+            pass
             
         if not streamings: 
             streamings.append("Não disponível")
@@ -477,12 +517,11 @@ def processar_em_segundo_plano(watchlist_data, sid):
                     atual += 1
                     set_progresso(sid, atual, total, False, chave)
                 except Exception as ex:
-                    print(f"Erro em uma das threads de busca de filme: {ex}")
+                    pass
                     
         salvar_dados_finais(sid, {"stats": {}, "watchlist": dados_filmes})
         
     except Exception as e:
-        print(f"Processamento em background foi interrompido ou falhou brutalmente: {e}")
         salvar_dados_finais(sid, {"stats": {}, "watchlist": dados_filmes})
     finally:
         set_progresso(sid, total, total, True, "Finalizado!")
@@ -509,7 +548,7 @@ def liberar_porta(porta):
             for p in res.stdout.strip().split('\n'):
                 if p: os.system(f'kill -9 {p}')
     except Exception as e: 
-        print(f"Erro ao liberar porta: {e}")
+        pass
 
 if __name__ == '__main__':
     PORTA = 5000
