@@ -143,14 +143,13 @@ def gerar_resposta_ia(prompt):
                         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
                     ]
                 }
-                # Timeout ajustado para não travar o Render
-                res_gemini = requests.post(url_gemini, json=payload_gemini, timeout=25) 
+                # Timeout REDUZIDO para 15s para evitar SIGKILL no Render
+                res_gemini = requests.post(url_gemini, json=payload_gemini, timeout=15) 
                 
                 if res_gemini.status_code == 200:
                     content = res_gemini.json()['candidates'][0]['content']['parts'][0]['text']
                     return limpar_e_parsear_json(content)
                 else:
-                    # Imprime o erro exato do Google no painel do Render
                     print(f"⚠️ Gemini falhou (Status {res_gemini.status_code}): {res_gemini.text[:300]}")
             except Exception as e: 
                 print(f"Erro de conexão com Gemini: {e}")
@@ -166,7 +165,8 @@ def gerar_resposta_ia(prompt):
                     "temperature": 0.85, 
                     "response_format": {"type": "json_object"} 
                 }
-                res_groq = requests.post(url_groq, headers=headers_groq, json=payload_groq, timeout=15)
+                # Timeout REDUZIDO para 12s para evitar SIGKILL no Render
+                res_groq = requests.post(url_groq, headers=headers_groq, json=payload_groq, timeout=12)
                 
                 if res_groq.status_code == 200:
                     content = res_groq.json()['choices'][0]['message']['content']
@@ -388,12 +388,12 @@ def gerar_perfil():
     Username: {stats.get('username')}, Bio: "{stats.get('bio')}", Favoritos: {', '.join(stats.get('profile_favorites', []))}, Média: {stats.get('media_notas')}.
     MISSÃO: Escreva um Roast letal em 2 PARÁGRAFOS curtos. Use apenas: 🙈🤓😼🥺😿😻💋🫦🔥💅👍☠️💀😢😭😞😓😔🤤🙄.
     NÃO USE asteriscos (*) ou qualquer formatação Markdown nos nomes dos filmes ou no texto.
+    Responda OBRIGATORIAMENTE em formato JSON:
     {{ "titulo": "TÍTULO", "personagem_referencia": "NOME", "filme_referencia": "FILME", "descricao": "ROAST" }}"""
     try: 
         return jsonify(gerar_resposta_ia(prompt))
     except Exception as e: 
         print(f"Erro ao gerar perfil IA: {e}")
-        # Retorna erro explícito para o front-end não travar
         if "RATE_LIMIT" in str(e):
             return jsonify({"erro": "RATE_LIMIT"})
             
@@ -415,11 +415,9 @@ def oraculo():
         tentativas_ia = 0
         is_real_terror = False
 
-        # Reduzimos o máximo de tentativas para 3, para evitar que a IA estoure os tokens por minuto
-        while len(recs_finais) < 4 and tentativas_ia < 3:
+        # Reduzimos o máximo de tentativas para 2, para evitar que o servidor sofra Timeout do Render (SIGKILL)
+        while len(recs_finais) < 4 and tentativas_ia < 2:
             favoritos = request.json.get('favorites', [])
-            
-            # Reduzimos a amostra enviada no prompt para poupar Tokens de Entrada
             blacklist_amostra = random.sample(list(blacklist_total), min(100, len(blacklist_total)))
 
             prompt = f"""Atue como curador profissional. Favoritos do usuário: {favoritos}.
@@ -431,6 +429,7 @@ def oraculo():
             
             DICA: Se ele gosta de coisas populares, procure o 'lado B'. Se gosta de cult, procure o 'underground'.
             NÃO USE asteriscos (*) nos nomes.
+            Responda OBRIGATORIAMENTE em formato JSON:
             {{ "recomendacoes": [ {{"rec_original": "TITLE", "rec": "TITLE", "ano": 2000, "base": "GENERO", "desc": "DESC"}} ] }}"""
 
             dados_json = gerar_resposta_ia(prompt)
@@ -446,12 +445,11 @@ def oraculo():
                         if len(recs_finais) >= 8: break 
             
             tentativas_ia += 1
-            if tentativas_ia >= 2 and len(recs_finais) < 4:
+            if tentativas_ia >= 1 and len(recs_finais) < 4:
                 is_real_terror = True
             
             if len(recs_finais) < 4: 
-                # Pausa um pouco maior para a IA "respirar" e não ativar o Rate Limit de RPM
-                time.sleep(2.0)
+                time.sleep(0.5)
 
         res_payload = {"recomendacoes": recs_finais}
         if is_real_terror:
@@ -463,7 +461,6 @@ def oraculo():
         return jsonify(res_payload)
     except Exception as e:
         print(f"Erro Oráculo: {e}")
-        # DEVOLVE O ERRO CORRETO PARA O FRONTEND NÃO FICAR EM LOOP E NÃO ACIONAR O TERROR FALSO
         if "RATE_LIMIT" in str(e):
             return jsonify({"erro": "RATE_LIMIT", "recomendacoes": []})
         return jsonify({"erro": "Falha", "recomendacoes": []})
